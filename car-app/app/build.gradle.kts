@@ -8,6 +8,11 @@ plugins {
 val useFakes = providers.gradleProperty("atthedoor.useFakes").orElse("false").get().toBoolean()
 val shareBaseUrl = providers.gradleProperty("atthedoor.shareBaseUrl").orElse("http://10.0.2.2:8787").get()
 
+// release 서명. ~/.gradle/gradle.properties 등에 아래 4개 값을 두면 그 키로 서명하고,
+// 없으면 디버그 키로 서명한다(공모전 심사·시연용으로 설치 가능한 release APK를 만들기 위함).
+//   atthedoor.storeFile, atthedoor.storePassword, atthedoor.keyAlias, atthedoor.keyPassword
+val releaseStoreFile = providers.gradleProperty("atthedoor.storeFile").orNull
+
 android {
     namespace = "app.atthedoor.app"
     compileSdk = 37
@@ -24,9 +29,21 @@ android {
         buildConfigField("String", "SHARE_BASE_URL", "\"$shareBaseUrl\"")
     }
 
+    signingConfigs {
+        if (releaseStoreFile != null) {
+            create("release") {
+                storeFile = file(releaseStoreFile)
+                storePassword = providers.gradleProperty("atthedoor.storePassword").get()
+                keyAlias = providers.gradleProperty("atthedoor.keyAlias").get()
+                keyPassword = providers.gradleProperty("atthedoor.keyPassword").get()
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 
@@ -58,4 +75,19 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.zxing.core)
+}
+
+// 공모전 제출 규칙: 저장소의 apk/ 폴더에 `팀명_앱이름_release.apk`
+//   ./gradlew :app:exportReleaseApk -Patthedoor.teamName=팀명
+val exportReleaseApk by tasks.registering(Copy::class) {
+    group = "distribution"
+    description = "release APK를 저장소 루트 apk/ 폴더에 제출 규칙 이름으로 복사한다."
+    val teamName: String? = providers.gradleProperty("atthedoor.teamName").orNull
+    doFirst {
+        if (teamName.isNullOrBlank()) throw GradleException("-Patthedoor.teamName=팀명 을 지정하세요")
+    }
+    dependsOn("assembleRelease")
+    from(layout.buildDirectory.file("outputs/apk/release/app-release.apk"))
+    into(rootDir.resolve("../apk"))
+    rename { "${teamName}_문앞_release.apk" }
 }
