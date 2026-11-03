@@ -1,0 +1,20 @@
+# OS / IDE
+.DS_Store
+.idea/
+*.iml
+.vscode/
+
+# Android / Gradle
+car-app/.gradle/
+car-app/.kotlin/
+car-app/**/build/
+car-app/local.properties
+*.apk
+*.aab
+!apk/*.apk
+
+# Web
+web/node_modules/
+web/*.sqlite
+web/*.sqlite-*
+web/.env

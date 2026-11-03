@@ -1,0 +1,71 @@
+{
+  "venueId": "saebom-hall",
+  "name": "새봄문화회관 소공연장",
+  "demo": true,
+  "contact": "02-000-0000",
+  "entrances": [
+    {
+      "id": "E-front",
+      "name": "정문",
+      "point": [37.50010, 127.03600],
+      "photos": ["saebom-hall/e-front-1.jpg"],
+      "hours": "09:00-22:00",
+      "stepFree": { "value": true, "evidence": "ev-1" }
+    },
+    {
+      "id": "E-back",
+      "name": "후문",
+      "point": [37.49960, 127.03640],
+      "photos": ["saebom-hall/e-back-1.jpg", "saebom-hall/e-back-2.jpg"],
+      "hours": "09:00-22:00",
+      "stepFree": { "value": true, "evidence": "ev-1" }
+    }
+  ],
+  "candidates": [
+    {
+      "id": "A",
+      "type": "dropoff",
+      "name": "정문 승하차 구역",
+      "accessPoint": { "point": [37.50020, 127.03590], "approach": "정문 진입로" },
+      "leavesPassengerAlone": true,
+      "driverParkingId": "B",
+      "walk": {
+        "toEntrance": "E-front",
+        "stairs": { "value": false, "evidence": "ev-1" },
+        "distanceM": { "value": 15, "evidence": "ev-1" },
+        "steps": ["승하차 구역에서 정문 자동문으로 이동"]
+      }
+    },
+    {
+      "id": "B",
+      "type": "parking",
+      "name": "후문 일반 주차 구역",
+      "accessPoint": { "point": [37.49940, 127.03660], "approach": "후문 주차장 입구" },
+      "eligibility": "general",
+      "hours": "08:00-23:00",
+      "liveAvailability": null,
+      "walk": {
+        "toEntrance": "E-back",
+        "stairs": { "value": false, "evidence": "ev-1" },
+        "distanceM": { "value": 80, "evidence": "ev-1" },
+        "steps": ["주차장 출구 쪽 보행로로 나가기", "파란 안내판을 지나 후문으로 이동"]
+      }
+    },
+    {
+      "id": "C",
+      "type": "parking",
+      "name": "지하 주차장",
+      "accessPoint": { "point": [37.50000, 127.03550], "approach": "지하 진입로" },
+      "eligibility": "general",
+      "walk": {
+        "toEntrance": "E-front",
+        "stairs": { "value": null, "evidence": null },
+        "distanceM": { "value": null, "evidence": null },
+        "steps": []
+      }
+    }
+  ],
+  "evidence": [
+    { "id": "ev-1", "source": "데모 현장 조사", "checkedAt": "2026-11-01", "status": "demo" }
+  ]
+}
