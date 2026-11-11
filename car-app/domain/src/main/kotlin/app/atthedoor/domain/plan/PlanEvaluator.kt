@@ -3,23 +3,54 @@ package app.atthedoor.domain.plan
 import app.atthedoor.domain.model.Candidate
 import app.atthedoor.domain.model.CandidateType
 import app.atthedoor.domain.model.Eligibility
-import app.atthedoor.domain.model.MobilityAid
+import app.atthedoor.domain.model.Evidence
+import app.atthedoor.domain.model.Josa
 import app.atthedoor.domain.model.TravelConditions
 import app.atthedoor.domain.model.Venue
 import app.atthedoor.domain.model.VerificationStatus
+import app.atthedoor.domain.model.isWheelchair
 import java.time.LocalTime
 
 enum class VerdictKind { RECOMMENDED, ELIGIBLE, NEEDS_CHECK, EXCLUDED }
 
-data class Verdict(val kind: VerdictKind, val reasons: List<String>)
+/**
+ * [reasons]는 판정의 이유(추천이면 장점, 제외·확인 필요면 걸린 조건),
+ * [cautions]는 판정과 별개로 현장에서 확인해야 할 사항이다.
+ */
+data class Verdict(
+    val kind: VerdictKind,
+    val reasons: List<String>,
+    val cautions: List<String> = emptyList(),
+    /** 이 후보를 막은 이유가 사용자가 바꿀 수 있는 조건 하나뿐일 때, 그 조건. 화면은 ‘이렇게 바꾸면 후보가 돼요’로 보여 준다. */
+    val hint: ConditionHint? = null,
+)
 
-data class CandidateResult(val candidate: Candidate, val verdict: Verdict)
+enum class ConditionHint(val label: String) {
+    ADD_OTHER_GUARDIAN("다른 보호자가 함께하면 후보가 돼요"),
+    CONFIRM_PERMIT("장애인 주차 자격이 있으면 후보가 돼요"),
+}
+
+data class CandidateResult(
+    val candidate: Candidate,
+    val verdict: Verdict,
+    /** 이 후보의 핵심 사실(보행 동선 계단 여부)을 뒷받침하는 근거. 화면에 출처와 확인 날짜를 보여 준다. */
+    val evidence: Evidence?,
+) {
+    val selectable: Boolean get() = verdict.kind == VerdictKind.RECOMMENDED || verdict.kind == VerdictKind.ELIGIBLE
+}
 
 data class Evaluation(val results: List<CandidateResult>) {
     val recommended: CandidateResult? get() = results.firstOrNull { it.verdict.kind == VerdictKind.RECOMMENDED }
+    val selectable: List<CandidateResult> get() = results.filter { it.selectable }
     fun of(kind: VerdictKind): List<CandidateResult> = results.filter { it.verdict.kind == kind }
     fun verdictOf(candidateId: String): Verdict? = results.firstOrNull { it.candidate.id == candidateId }?.verdict
 }
+
+/** 이번 여행에서 사용자가 이용할 수 없다고 알린 후보와 입구. 전체 사용자의 확정 정보로 승격하지 않는다. */
+data class Unavailable(
+    val candidateIds: Set<String> = emptySet(),
+    val entranceIds: Set<String> = emptySet(),
+)
 
 /**
  * 도착 계획 후보를 평가하는 명시적 규칙 엔진.
@@ -31,10 +62,12 @@ class PlanEvaluator {
         venue: Venue,
         conditions: TravelConditions,
         at: LocalTime,
-        unavailableIds: Set<String> = emptySet(),
+        unavailable: Unavailable = Unavailable(),
     ): Evaluation {
+        // 만차 같은 이용 불가 제보는 차를 세우는 구역(lotId) 전체에 적용한다. 같은 주차장에서 다른 입구로 가는 후보도 함께 빠진다.
+        val blockedLots = venue.candidates.filter { it.id in unavailable.candidateIds }.map { it.lotId }.toSet()
         val checked = venue.candidates.map { candidate ->
-            candidate to checkRequired(venue, candidate, conditions, at, unavailableIds)
+            candidate to checkRequired(venue, candidate, conditions, at, unavailable, blockedLots)
         }
 
         val passing = checked
@@ -45,15 +78,17 @@ class PlanEvaluator {
         val results = buildList {
             passing.forEachIndexed { index, candidate ->
                 val kind = if (index == 0) VerdictKind.RECOMMENDED else VerdictKind.ELIGIBLE
-                add(CandidateResult(candidate, Verdict(kind, positiveReasons(venue, candidate))))
+                add(result(candidate, Verdict(kind, positiveReasons(venue, candidate, conditions), cautions(candidate))))
             }
             checked.filter { it.second?.kind == VerdictKind.NEEDS_CHECK }
-                .forEach { (c, v) -> add(CandidateResult(c, v!!)) }
+                .forEach { (c, v) -> add(result(c, v!!)) }
             checked.filter { it.second?.kind == VerdictKind.EXCLUDED }
-                .forEach { (c, v) -> add(CandidateResult(c, v!!)) }
+                .forEach { (c, v) -> add(result(c, v!!)) }
         }
         return Evaluation(results)
     }
+
+    private fun result(c: Candidate, v: Verdict) = CandidateResult(c, v, c.walk.stairs.evidence ?: c.walk.distanceM.evidence)
 
     /** 필수 조건 검사. 통과하면 null, 아니면 EXCLUDED 또는 NEEDS_CHECK. 제외가 확인 필요보다 우선한다. */
     private fun checkRequired(
@@ -61,32 +96,39 @@ class PlanEvaluator {
         c: Candidate,
         cond: TravelConditions,
         at: LocalTime,
-        unavailableIds: Set<String>,
+        unavailable: Unavailable,
+        blockedLots: Set<String>,
     ): Verdict? {
         val excluded = mutableListOf<String>()
         val needsCheck = mutableListOf<String>()
+        val hints = mutableListOf<ConditionHint>()
 
-        if (c.id in unavailableIds) excluded += "이번 여행에서 이용할 수 없다고 알려 주셨어요"
+        if (c.lotId in blockedLots) excluded += "이번 여행에서 이 구역을 이용할 수 없다고 알려 주셨어요"
 
         if (c.type == CandidateType.DROPOFF && cond.companionRequired) {
             if (!cond.otherGuardian && c.leavesPassengerAlone) {
                 excluded += "운전자가 주차하는 동안 함께할 다른 보호자가 없어요"
+                hints += ConditionHint.ADD_OTHER_GUARDIAN
             } else if (c.driverParkingId == null || venue.candidate(c.driverParkingId) == null) {
                 needsCheck += "하차 후 운전자가 주차할 곳이 확인되지 않았어요"
+            } else if (venue.candidate(c.driverParkingId)?.lotId in blockedLots) {
+                excluded += "하차 후 운전자가 주차할 구역을 이용할 수 없다고 알려 주셨어요"
             }
         }
 
         if (c.eligibility == Eligibility.DISABLED_ONLY && !cond.hasDisabledParkingPermit) {
-            excluded += "장애인 전용 구역은 이용 자격을 확인한 경우에만 안내해요"
+            excluded += "장애인 전용 구역이에요. 이용 자격을 확인한 경우에만 안내해요"
+            hints += ConditionHint.CONFIRM_PERMIT
         }
 
-        c.hours?.let { if (!it.isOpenAt(at)) excluded += "지금은 운영 시간이 아니에요" }
+        c.hours?.let { if (!it.isOpenAt(at)) excluded += "도착 시각에 운영하지 않아요 (운영 ${it.label})" }
 
         val entrance = venue.entrance(c.walk.toEntranceId)
         if (entrance == null) {
             needsCheck += "연결된 건물 입구 정보가 없어요"
         } else {
-            entrance.hours?.let { if (!it.isOpenAt(at)) excluded += "${entrance.name}은 지금 출입 시간이 아니에요" }
+            if (entrance.id in unavailable.entranceIds) excluded += "${Josa.eulReul(entrance.name)} 이용할 수 없다고 알려 주셨어요"
+            entrance.hours?.let { if (!it.isOpenAt(at)) excluded += "도착 시각에 ${Josa.iGa(entrance.name)} 닫혀 있어요 (출입 ${it.label})" }
         }
 
         if (cond.effectiveStepFreeRequired) {
@@ -102,13 +144,16 @@ class PlanEvaluator {
             }
         }
 
-        if (cond.mobilityAid == MobilityAid.FOLDING_WHEELCHAIR || cond.mobilityAid == MobilityAid.POWER_WHEELCHAIR) {
-            // 통행 폭·경사 데이터가 아직 스키마에 없으므로 휠체어는 항상 추가 확인 대상으로 둔다.
-            needsCheck += "휠체어 통행 폭과 경사 정보는 아직 확인되지 않았어요"
+        if (cond.mobilityAid.isWheelchair) {
+            val w = c.walk.wheelchair
+            when {
+                w.known && w.value == false -> excluded += "휠체어로 지나가기 어려운 구간이 있어요"
+                !w.known -> needsCheck += "휠체어 통행 폭과 경사가 확인되지 않았어요"
+            }
         }
 
         return when {
-            excluded.isNotEmpty() -> Verdict(VerdictKind.EXCLUDED, excluded)
+            excluded.isNotEmpty() -> Verdict(VerdictKind.EXCLUDED, excluded, hint = hints.singleOrNull()?.takeIf { excluded.size == 1 && needsCheck.isEmpty() })
             needsCheck.isNotEmpty() -> Verdict(VerdictKind.NEEDS_CHECK, needsCheck)
             else -> null
         }
@@ -131,13 +176,24 @@ class PlanEvaluator {
         return base.then(trust).thenBy { it.id }
     }
 
-    private fun positiveReasons(venue: Venue, c: Candidate): List<String> = buildList {
-        if (c.type == CandidateType.PARKING) add("함께 주차한 뒤 입구까지 같이 걸어갈 수 있어요")
-        if (c.walk.stairs.known && c.walk.stairs.value == false) add("확인된 보행 동선에 계단이 없어요")
-        if (c.walk.distanceM.known) add("입구까지 약 ${c.walk.distanceM.value}m")
-        if (c.liveAvailabilitySource == null && c.type == CandidateType.PARKING) {
-            add("주차 여유 공간은 현장에서 확인해야 해요")
+    private fun positiveReasons(venue: Venue, c: Candidate, cond: TravelConditions): List<String> = buildList {
+        val entranceName = venue.entrance(c.walk.toEntranceId)?.name ?: "입구"
+        when {
+            c.type == CandidateType.PARKING && cond.companionRequired -> add("함께 주차한 뒤 ${entranceName}까지 같이 걸어가요")
+            c.type == CandidateType.PARKING -> add("주차한 뒤 ${Josa.euroRo(entranceName)} 걸어가요")
+            cond.companionRequired && cond.otherGuardian -> {
+                val parking = c.driverParkingId?.let(venue::candidate)?.name
+                add("다른 보호자와 먼저 내리고, 운전자는 ${parking ?: "지정 구역"}에 주차해요")
+            }
+            else -> add("${entranceName} 바로 앞에서 내려요")
         }
-        venue.entrance(c.walk.toEntranceId)?.let { add("${it.name}으로 들어가요") }
+        if (c.walk.stairs.known && c.walk.stairs.value == false) add("확인된 보행 동선에 계단이 없어요")
+        if (cond.mobilityAid.isWheelchair && c.walk.wheelchair.known && c.walk.wheelchair.value == true) add("휠체어 통행 폭과 경사를 확인한 동선이에요")
+        if (c.walk.distanceM.known) add("${entranceName}까지 약 ${c.walk.distanceM.value}m")
+    }
+
+    private fun cautions(c: Candidate): List<String> = buildList {
+        if (c.liveAvailabilitySource == null && c.type == CandidateType.PARKING) add("주차 여유 공간은 현장에서 확인해야 해요")
+        if (!c.walk.distanceM.known) add("보행 거리는 확인된 값이 없어요")
     }
 }

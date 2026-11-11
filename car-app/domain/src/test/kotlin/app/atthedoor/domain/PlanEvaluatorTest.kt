@@ -8,6 +8,7 @@ import app.atthedoor.domain.model.Eligibility
 import app.atthedoor.domain.model.Fact
 import app.atthedoor.domain.model.MobilityAid
 import app.atthedoor.domain.plan.PlanEvaluator
+import app.atthedoor.domain.plan.Unavailable
 import app.atthedoor.domain.plan.VerdictKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -36,8 +37,8 @@ class PlanEvaluatorTest {
         val solo = feasible(evaluator.evaluate(venue, soloGuardian, noon))
         val withOther = feasible(evaluator.evaluate(venue, withOtherGuardian, noon))
 
-        assertEquals(setOf("B"), solo)
-        assertEquals(setOf("A", "B"), withOther)
+        assertEquals(setOf("B", "B2", "E"), solo)
+        assertEquals(setOf("A", "B", "B2", "E"), withOther)
         assertNotEquals(solo, withOther)
     }
 
@@ -45,7 +46,7 @@ class PlanEvaluatorTest {
     fun `수용 - 계단 없음이 필수이면 계단 경로나 미확인 경로가 추천되지 않는다`() {
         val withStairs = venue.copy(
             candidates = venue.candidates.map {
-                if (it.id == "B") it.copy(walk = it.walk.copy(stairs = Fact(true, it.walk.stairs.evidence))) else it
+                if (it.id == "B" || it.id == "B2" || it.id == "E") it.copy(walk = it.walk.copy(stairs = Fact(true, it.walk.stairs.evidence))) else it
             },
         )
         val result = evaluator.evaluate(withStairs, soloGuardian, noon)
@@ -66,9 +67,28 @@ class PlanEvaluatorTest {
 
     @Test
     fun `이용 불가로 알린 후보는 제외하고 같은 조건의 대안을 찾는다`() {
-        val result = evaluator.evaluate(venue, withOtherGuardian, noon, unavailableIds = setOf("B"))
+        val result = evaluator.evaluate(venue, withOtherGuardian, noon, Unavailable(candidateIds = setOf("B")))
         assertEquals(VerdictKind.EXCLUDED, result.verdictOf("B")?.kind)
-        assertEquals("A", result.recommended?.candidate?.id)
+        // 만차는 주차장 단위다: 같은 후문 주차장(B2)도 빠진다.
+        assertEquals(VerdictKind.EXCLUDED, result.verdictOf("B2")?.kind)
+        // 정문 하차(A)는 운전자가 B에 주차하는 계획이라 B가 막히면 함께 빠진다.
+        assertEquals(VerdictKind.EXCLUDED, result.verdictOf("A")?.kind)
+        assertEquals("E", result.recommended?.candidate?.id)
+    }
+
+    @Test
+    fun `입구 폐쇄를 알리면 그 입구로 가는 모든 후보가 빠지고 다른 입구 후보가 남는다`() {
+        val result = evaluator.evaluate(venue, soloGuardian, noon, Unavailable(entranceIds = setOf("E-back")))
+        assertEquals(VerdictKind.EXCLUDED, result.verdictOf("B")?.kind)
+        assertEquals("B2", result.recommended?.candidate?.id)
+    }
+
+    @Test
+    fun `추천 후보는 출처와 확인 날짜를 함께 돌려주고 현장 확인 사항을 따로 둔다`() {
+        val b = evaluator.evaluate(venue, soloGuardian, noon).recommended!!
+        assertEquals("2026-11-01", b.evidence?.checkedAt)
+        assertTrue(b.verdict.cautions.any { "현장" in it })
+        assertTrue(b.verdict.reasons.none { "현장" in it })
     }
 
     @Test
@@ -85,6 +105,22 @@ class PlanEvaluatorTest {
     fun `운영 시간 밖이면 제외한다`() {
         val result = evaluator.evaluate(venue, soloGuardian, java.time.LocalTime.of(23, 0))
         assertTrue(result.results.none { it.verdict.kind == VerdictKind.RECOMMENDED })
+    }
+
+    @Test
+    fun `휠체어 통행을 확인한 동선만 추천하고 모르면 확인 필요, 어려우면 제외한다`() {
+        val demo = venue.candidate("B")!!.walk.stairs.evidence
+        val v = venue.copy(candidates = venue.candidates.map {
+            when (it.id) {
+                "B2" -> it.copy(walk = it.walk.copy(wheelchair = Fact(true, demo)))
+                "E" -> it.copy(walk = it.walk.copy(wheelchair = Fact(false, demo)))
+                else -> it
+            }
+        })
+        val r = evaluator.evaluate(v, soloGuardian.copy(mobilityAid = MobilityAid.FOLDING_WHEELCHAIR), noon)
+        assertEquals("B2", r.recommended?.candidate?.id)
+        assertEquals(VerdictKind.NEEDS_CHECK, r.verdictOf("B")?.kind)
+        assertEquals(VerdictKind.EXCLUDED, r.verdictOf("E")?.kind)
     }
 
     @Test

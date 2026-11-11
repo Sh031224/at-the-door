@@ -77,14 +77,14 @@ class TripMachineTest {
         val walking = approaching()
             .on(TripEvent.ParkingConfirmed(drivingRestricted = false))
             .on(TripEvent.WalkStarted)
-        val replanning = walking.on(TripEvent.CandidateUnavailable("B"))
+        val replanning = walking.on(TripEvent.EntranceBlocked("E-back"))
         assertEquals(TripPhase.REPLANNING, replanning.phase)
         assertEquals(soloGuardian, replanning.conditions)
-        assertEquals(setOf("B"), replanning.unavailableIds)
+        assertEquals(setOf("E-back"), replanning.blockedEntranceIds)
 
-        val resumed = replanning.on(TripEvent.AlternativeChosen("D"))
+        val resumed = replanning.on(TripEvent.AlternativeChosen("B2", sameLot = true))
         assertEquals(TripPhase.WALKING, resumed.phase)
-        assertEquals("D", resumed.selectedCandidateId)
+        assertEquals("B2", resumed.selectedCandidateId)
     }
 
     @Test
@@ -94,9 +94,33 @@ class TripMachineTest {
     }
 
     @Test
+    fun `입구 도착을 잘못 눌렀으면 되돌려 보행 안내로 돌아간다`() {
+        val visiting = approaching()
+            .on(TripEvent.ParkingConfirmed(drivingRestricted = false))
+            .on(TripEvent.WalkStarted).on(TripEvent.ArrivedAtEntrance)
+        assertEquals(TripPhase.WALKING, visiting.on(TripEvent.ArrivalUndone).phase)
+    }
+
+    @Test
+    fun `같은 조건으로 바꾸면 재계획하지 않는다`() {
+        val t = approaching()
+        assertEquals(t, t.on(TripEvent.ConditionsChanged(soloGuardian)))
+    }
+
+    @Test
+    fun `여행을 마친 뒤 제보는 한 번만 받는다`() {
+        val done = approaching()
+            .on(TripEvent.ParkingConfirmed(drivingRestricted = false))
+            .on(TripEvent.WalkStarted).on(TripEvent.ArrivedAtEntrance).on(TripEvent.ReturnStarted).on(TripEvent.BackInCar)
+        val once = done.on(TripEvent.FeedbackGiven(setOf(app.atthedoor.domain.trip.FeedbackKind.ROUTE)))
+        assertEquals(setOf(app.atthedoor.domain.trip.FeedbackKind.ROUTE), once.feedback)
+        assertEquals(once, once.on(TripEvent.FeedbackGiven(emptySet())))
+    }
+
+    @Test
     fun `보호자 구성이 바뀌면 전체를 재평가하고 내비를 다시 요청한다`() {
         val t = approaching().on(TripEvent.ConditionsChanged(withOtherGuardian))
         assertEquals(TripPhase.REPLANNING, t.phase)
-        assertEquals(TripPhase.NAVI_REQUESTED, t.on(TripEvent.AlternativeChosen("A")).phase)
+        assertEquals(TripPhase.NAVI_REQUESTED, t.on(TripEvent.AlternativeChosen("A", sameLot = false)).phase)
     }
 }
