@@ -48,12 +48,12 @@ class PleosNaviPort(
     override fun requestRoute(target: AccessPoint): Flow<NaviResult> = callbackFlow {
         var settled = false
         var guidingAt = 0L
-        fun guiding(reason: String) {
+        fun guiding(reason: String, info: RouteStartInfo? = null) {
             if (settled) return
             settled = true
             guidingAt = SystemClock.elapsedRealtime()
             Log.d(TAG, "guiding by $reason")
-            trySend(NaviResult.Guiding)
+            trySend(NaviResult.Guiding(info?.duration?.takeIf { it > 0 }, info?.distance?.takeIf { it > 0 }))
         }
         val listener = object : NaviHelperEventListener {
             override fun onRouteStarted(routeStartInfo: RouteStartInfo) {
@@ -61,7 +61,7 @@ class PleosNaviPort(
                 // Pleos Connect Emulator v2.1.0 실측(2026-11-11): Navigation 앱은 경로 탐색을 마치고 안내를 시작할 때
                 // 목적지 이름·거리·시간을 담아 onRouteStarted를 보내고, onRoutingCompleted는 보내지 않았다.
                 // 그래서 ‘우리가 보낸 목적지 이름 + 계산된 거리’가 있으면 안내 시작으로 본다. 그렇지 않으면 탐색 중이다.
-                if (routeStartInfo.name == target.approach && routeStartInfo.distance > 0) guiding("onRouteStarted")
+                if (routeStartInfo.name == target.approach && routeStartInfo.distance > 0) guiding("onRouteStarted", routeStartInfo)
                 else trySend(NaviResult.Searching)
             }
 

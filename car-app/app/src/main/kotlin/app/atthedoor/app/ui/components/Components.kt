@@ -1,6 +1,7 @@
 package app.atthedoor.app.ui.components
 
 import android.graphics.BitmapFactory
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -129,15 +130,18 @@ fun ChoiceTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
+    /** 여러 개 고르기면 사각 체크박스, 하나만 고르면 원형 라디오 */
+    multi: Boolean = false,
 ) {
     val c = Atd.colors
+    val mark = if (multi) RoundedCornerShape(4.dp) else CircleShape
     Column(
         modifier
             .clip(Corner)
             .background(if (selected) c.surfaceAlt else c.surface)
             .border(if (selected) 3.dp else 1.5.dp, if (selected) c.primary else c.line, Corner)
             .clickable(onClick = onClick)
-            .semantics { this.selected = selected; role = Role.RadioButton }
+            .semantics { this.selected = selected; role = if (multi) Role.Checkbox else Role.RadioButton }
             .padding(28.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -145,7 +149,7 @@ fun ChoiceTile(
             if (icon != null) Icon(icon, null, tint = if (selected) c.primary else c.inkMuted, modifier = Modifier.size(56.dp))
             Spacer(Modifier.weight(1f))
             Box(
-                Modifier.size(40.dp).clip(CircleShape).background(if (selected) c.primary else c.surface).border(2.dp, if (selected) c.primary else c.line, CircleShape),
+                Modifier.size(40.dp).clip(mark).background(if (selected) c.primary else c.surface).border(2.dp, if (selected) c.primary else c.lineStrong, mark),
                 contentAlignment = Alignment.Center,
             ) { if (selected) Icon(Glyph.Check, null, tint = c.onPrimary, modifier = Modifier.size(28.dp)) }
         }
@@ -162,13 +166,19 @@ fun AtdChip(text: String, selected: Boolean, onClick: (() -> Unit)?, modifier: M
         modifier
             .heightIn(min = Touch.min)
             .clip(Corner)
-            .background(if (selected) c.surfaceAlt else c.surface)
-            .border(if (selected) 2.dp else 1.5.dp, if (selected) c.primary else c.line, Corner)
+            .background(if (selected) c.primarySoft else c.surface)
+            .border(if (selected) 3.dp else 1.dp, if (selected) c.primary else c.lineStrong, Corner)
             .let { m -> if (onClick != null) m.clickable(onClick = onClick).semantics { this.selected = selected } else m }
             .padding(horizontal = 24.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = if (selected) Type.bodyStrong else Type.body, color = if (selected) c.primary else c.ink, maxLines = 1)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (selected) {
+                Icon(Glyph.Check, null, tint = c.primary, modifier = Modifier.size(28.dp))
+                Spacer(Modifier.width(8.dp))
+            }
+            Text(text, style = if (selected) Type.bodyStrong else Type.body, color = if (selected) c.primary else c.ink, maxLines = 1)
+        }
     }
 }
 
@@ -185,12 +195,12 @@ fun VerdictBadge(kind: VerdictKind) {
         VerdictKind.EXCLUDED -> "추천하지 않음"
     }
     val bg = when (kind) {
-        VerdictKind.RECOMMENDED -> c.recommended
+        VerdictKind.RECOMMENDED -> c.successBg
         VerdictKind.NEEDS_CHECK -> c.cautionBg
         else -> c.surfaceAlt
     }
     val fg = when (kind) {
-        VerdictKind.RECOMMENDED -> c.onPrimary
+        VerdictKind.RECOMMENDED -> c.recommended
         VerdictKind.NEEDS_CHECK -> c.caution
         VerdictKind.ELIGIBLE -> c.ink
         VerdictKind.EXCLUDED -> c.inkMuted
@@ -363,11 +373,13 @@ fun BoxScope.SideSheet(title: String, onClose: () -> Unit, width: Dp = 760.dp, f
             )
             // 아래에 내용이 더 있으면 흐린 띠와 안내로 알려 준다.
             if (scroll.maxValue > 0 && scroll.value < scroll.maxValue) {
-                Box(
-                    Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(72.dp)
-                        .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, c.surface))),
-                    contentAlignment = Alignment.BottomCenter,
-                ) { Text("아래에 더 있어요", style = Type.caption, color = c.inkMuted, modifier = Modifier.padding(bottom = 6.dp)) }
+                Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
+                    Box(Modifier.fillMaxWidth().height(40.dp).background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, c.surface))))
+                    Row(Modifier.fillMaxWidth().height(56.dp).background(c.surface), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                        Text("아래로 밀면 더 있어요", style = Type.caption, color = c.inkMuted)
+                        Icon(androidx.compose.material.icons.Icons.Outlined.KeyboardArrowDown, null, tint = c.inkMuted, modifier = Modifier.size(32.dp))
+                    }
+                }
             }
         }
         if (footer != null) {
@@ -400,7 +412,10 @@ fun ListRow(
             Text(title, style = Type.bodyStrong, color = c.ink)
             if (subtitle != null) Text(subtitle, style = Type.body, color = c.inkMuted)
         }
-        if (trailing != null) trailing()
+        if (trailing != null) {
+            Spacer(Modifier.width(24.dp))
+            trailing()
+        }
         else if (onClick != null) Icon(Glyph.Chevron, null, tint = c.inkMuted, modifier = Modifier.size(36.dp))
     }
 }

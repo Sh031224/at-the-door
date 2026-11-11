@@ -17,7 +17,8 @@ import kotlinx.coroutines.flow.StateFlow
  */
 sealed interface NaviResult {
     data object Searching : NaviResult
-    data object Guiding : NaviResult
+    /** 안내 시작. 내비가 알려 준 예상 시간(초)·거리(m)가 있으면 함께 담는다(RouteStartInfo). */
+    data class Guiding(val durationSec: Int? = null, val distanceM: Int? = null) : NaviResult
     /** onDestinationArrived. 차량 접근 지점 도착 참고 신호일 뿐, 사람의 도착이 아니다. */
     data object Arrived : NaviResult
     /** onRouteCancelled. 운전자가 내비에서 안내를 취소함 */
@@ -98,6 +99,8 @@ data class TripSnapshot(
     val walkSummary: String,
     /** 같은 조건의 대안을 찾지 못함. 휴대폰은 시설 연락 화면으로 바뀐다. */
     val noAlternative: Boolean,
+    /** 재계획으로 길이 바뀐 이유. 휴대폰 위에 한 줄로 보인다. */
+    val changeNote: String?,
 )
 
 data class ShareLink(val token: String, val url: String, val expiresAtEpochMs: Long)

@@ -49,6 +49,14 @@ enum class Arrival(val label: String, val minutes: Long) {
 
 enum class NaviStatus { IDLE, SENDING, SEARCHING, GUIDING }
 
+data class RouteSummary(val durationSec: Int?, val distanceM: Int?) {
+    val label: String?
+        get() = listOfNotNull(
+            durationSec?.let { "약 ${(it + 59) / 60}분" },
+            distanceM?.let { if (it >= 1000) "%.1fkm".format(it / 1000.0).replace(".0km", "km") else "${it}m" },
+        ).joinToString(" · ").ifEmpty { null }
+}
+
 sealed interface ShareState {
     data object None : ShareState
     data object Creating : ShareState
@@ -85,6 +93,8 @@ data class TripUiState(
     val feedbackDraft: Set<FeedbackKind> = emptySet(),
     /** 내비가 목적 지점 도착을 알림(onDestinationArrived). 사람의 도착이 아니라 ‘주차했어요’를 앞에 둘 시점의 참고 신호다. */
     val naviArrived: Boolean = false,
+    /** 내비가 알려 준 남은 시간·거리. 내비가 주지 않으면 비워 둔다(지어내지 않는다). */
+    val route: RouteSummary? = null,
 ) {
     val selected: Candidate? get() = trip?.selectedCandidateId?.let { venue?.candidate(it) }
     val selectedEntrance: Entrance? get() = selected?.let { venue?.entrance(it.walk.toEntranceId) }
@@ -271,16 +281,16 @@ class TripViewModel(private val c: AppContainer) : ViewModel() {
 
     private fun requestNavigation(candidate: Candidate) {
         naviJob?.cancel()
-        _state.update { it.copy(navi = NaviStatus.SENDING, naviArrived = false) }
+        _state.update { it.copy(navi = NaviStatus.SENDING, naviArrived = false, route = null) }
         naviJob = viewModelScope.launch {
             var guiding = false
             var arrived = false
             c.navi.requestRoute(candidate.accessPoint).collect { r ->
                 when (r) {
                     NaviResult.Searching -> _state.update { it.copy(navi = NaviStatus.SEARCHING) }
-                    NaviResult.Guiding -> {
+                    is NaviResult.Guiding -> {
                         guiding = true
-                        _state.update { it.copy(navi = NaviStatus.GUIDING) }
+                        _state.update { it.copy(navi = NaviStatus.GUIDING, route = RouteSummary(r.durationSec, r.distanceM)) }
                         dispatch(TripEvent.NaviStarted)
                     }
                     is NaviResult.Failed -> if (!guiding) failNavi("경로 안내를 시작하지 못했어요. 다시 안내를 눌러 주세요. (${r.code})")
@@ -480,6 +490,7 @@ class TripViewModel(private val c: AppContainer) : ViewModel() {
             contact = venue.contact,
             walkSummary = walkSummary(candidate),
             noAlternative = s.trip?.phase == TripPhase.NEEDS_CHECK,
+            changeNote = s.replanned?.takeIf { s.trip?.phase in setOf(TripPhase.WALKING, TripPhase.RETURNING) },
         )
     }
 

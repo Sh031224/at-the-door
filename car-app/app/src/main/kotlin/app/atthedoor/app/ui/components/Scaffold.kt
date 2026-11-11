@@ -129,11 +129,13 @@ private fun SegmentCell(s: Segment, modifier: Modifier) {
     val source = remember { MutableInteractionSource() }
     val pressed by source.collectIsPressedAsState()
     val bg = when {
+        s.kind == SegmentKind.PRIMARY && s.busy -> c.primary.copy(alpha = 0.75f)
         s.kind == SegmentKind.PRIMARY && !s.enabled -> c.fill
         s.kind == SegmentKind.PRIMARY -> if (pressed) c.primaryPressed else c.primary
         else -> if (pressed) c.fillPressed else c.fill
     }
     val fg = when {
+        s.busy -> c.onPrimary
         !s.enabled -> c.inkFaint
         s.kind == SegmentKind.PRIMARY -> c.onPrimary
         s.kind == SegmentKind.REPORT -> c.report
@@ -147,7 +149,7 @@ private fun SegmentCell(s: Segment, modifier: Modifier) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (s.busy) {
-            androidx.compose.material3.CircularProgressIndicator(Modifier.size(32.dp), color = c.primary, strokeWidth = 4.dp)
+            androidx.compose.material3.CircularProgressIndicator(Modifier.size(40.dp), color = c.onPrimary, strokeWidth = 4.dp)
             Spacer(Modifier.width(16.dp))
         } else if (s.icon != null) {
             Icon(s.icon, null, tint = fg, modifier = Modifier.size(36.dp))

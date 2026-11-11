@@ -35,10 +35,11 @@ class HttpSharePort(private val baseUrl: String, private val timeoutMs: Int = 5_
         val contact: String?,
         val walkSummary: String,
         val noAlternative: Boolean,
+        val changeNote: String?,
     )
 
     private fun TripSnapshot.dto() = CreateTripRequest(
-        venueName, planName, entranceName, entrancePhotos, photosAreIllustrations, steps, returnSteps, parkingNote, evidenceLabel, demo, contact, walkSummary, noAlternative,
+        venueName, planName, entranceName, entrancePhotos, photosAreIllustrations, steps, returnSteps, parkingNote, evidenceLabel, demo, contact, walkSummary, noAlternative, changeNote,
     )
 
     @Serializable

@@ -48,7 +48,7 @@ export const GuidePage: FC<{ trip: StoredTrip; events: PhoneEvent[] }> = ({ trip
     <section class="spot">
       <p class="label">주차한 곳</p>
       <p class="mid">{spot}</p>
-      {s.parkingNote ? <p class="big">{s.parkingNote}</p> : <p class="label">층과 구역을 남기지 않았어요</p>}
+      {s.parkingNote && <p class="big">{s.parkingNote}</p>}
       <p class="label">이용한 입구 · {s.entranceName}</p>
     </section>
   );
@@ -58,7 +58,7 @@ export const GuidePage: FC<{ trip: StoredTrip; events: PhoneEvent[] }> = ({ trip
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="robots" content="noindex" />
-        <title>{`${s.entranceName}까지 안내 · 문앞`}</title>
+        <title>{`${s.entranceName} 안내 · 문앞`}</title>
         <style>{css}</style>
       </head>
       <body>
@@ -84,7 +84,8 @@ export const GuidePage: FC<{ trip: StoredTrip; events: PhoneEvent[] }> = ({ trip
             </>
           ) : (
             <>
-              <h1>{stage === "return" ? "차로 돌아가는 길" : `${s.entranceName}까지 함께 가요`}</h1>
+              {s.changeNote && <p class="changed">✓ {s.changeNote}</p>}
+              <h1>{stage === "return" ? "차로 돌아가는 길" : `${s.entranceName}${/[가-힣]$/.test(s.entranceName) && ((s.entranceName.charCodeAt(s.entranceName.length - 1) - 0xac00) % 28 === 0 || (s.entranceName.charCodeAt(s.entranceName.length - 1) - 0xac00) % 28 === 8) ? "로" : "으로"} 가요`}</h1>
               <p class="sub">{stage === "return" ? `${spot}으로 돌아가요` : s.walkSummary}</p>
 
               {stage === "return" && spotCard}
@@ -212,7 +213,9 @@ h1 { font-size: 28px; line-height: 1.3; margin: 0 0 4px; } h2 { font-size: 15px;
 .label { margin: 0; color: var(--muted); font-size: 15px; } .big { font-size: 40px; font-weight: 700; margin: 4px 0 8px; line-height: 1.2; } .mid { font-size: 22px; font-weight: 700; margin: 2px 0 6px; }
 details.row { margin-top: 16px; background: var(--surface); border: 1px solid var(--line); }
 details.row summary { list-style: none; display:flex; justify-content: space-between; align-items:center; padding: 0 16px; min-height: 56px; cursor: pointer; }
-details.row summary b { color: var(--primary); }
+details.row summary b { color: var(--fg); } details.row summary b::after { content: "  바꾸기 ›"; color: var(--primary); font-weight: 500; }
+.changed { background: #0F2A1E; color: #6FD39A; padding: 12px 14px; margin: 0 0 12px; min-height: 48px; font-weight: 600; border-radius: 4px; }
+@media (prefers-color-scheme: light) { .changed { background: #E3F3E8; color: #1B7A3E; } }
 details.row form { display:flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 16px; }
 details.row input { flex: 1; min-width: 0; font-size: 17px; padding: 12px; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: var(--fg); }
 details.row form button { flex: 0 0 auto; }

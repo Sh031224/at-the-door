@@ -300,7 +300,11 @@ private fun ChoosingBody(state: TripUiState, vm: TripViewModel, open: (Sheet) ->
                 val gain = hint.candidate.walk.distanceM.takeIf { it.known }?.let { "(입구까지 약 ${it.value}m)" }.orEmpty()
                 val who = if (hint.verdict.hint == app.atthedoor.domain.plan.ConditionHint.ADD_OTHER_GUARDIAN) "다른 보호자가 함께라면" else "장애인 주차 표지가 있다면"
                 Text("$who ${hint.candidate.name}$gain${"도"} 쓸 수 있어요", Modifier.weight(1f), style = Type.bodyStrong, color = c.ink)
-                AtdButton("조건 바꿔 보기", { vm.applyHint(hint.verdict.hint!!) }, kind = ButtonKind.SECONDARY, height = 88.dp)
+                Spacer(Modifier.width(24.dp))
+                AtdButton(
+                    if (hint.verdict.hint == app.atthedoor.domain.plan.ConditionHint.ADD_OTHER_GUARDIAN) "다른 보호자로 바꿔 보기" else "주차 표지로 바꿔 보기",
+                    { vm.applyHint(hint.verdict.hint!!) }, kind = ButtonKind.SECONDARY, height = 88.dp,
+                )
             }
         }
     }
@@ -351,24 +355,33 @@ private fun ApproachBody(state: TripUiState, cue: HandoffCue?) {
     val entrance = state.selectedEntrance
     Column(verticalArrangement = Arrangement.spacedBy(28.dp)) {
         val point = shortPoint(plan.accessPoint.approach, state.venue)
-        if (cue != null) Headline("주차했나요?", sub = cue.message)
-        else Headline("가고 있어요", sub = plan.name)
+        if (cue != null) Headline(if (state.naviArrived) "주차했나요?" else "여기에 주차했나요?", sub = cue.message)
+        else Headline(state.route?.label?.let { "가고 있어요 · $it" } ?: "가고 있어요", sub = "${plan.name} · 안내를 시작할 때 내비가 알려 준 예상이에요".takeIf { state.route?.label != null } ?: plan.name)
         Row(horizontalArrangement = Arrangement.spacedBy(Gap)) {
             InverseBlock(Modifier.width(760.dp), sub = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(14.dp).background(if (cue != null) c.inkFaint else c.success))
                     Spacer(Modifier.width(14.dp))
-                    Text(if (cue != null) "목적지 근처예요" else "내비게이션 안내 중", style = Type.title, color = c.onInverse)
+                    // 기어 P 같은 차량 신호만으로는 목적지 근처라고 말하지 않는다. 내비 도착 신호가 있을 때만 그렇게 쓴다.
+                    Text(
+                        when {
+                            state.naviArrived -> "목적지 근처예요"
+                            cue != null -> "차가 멈췄어요"
+                            else -> "내비게이션 안내 중"
+                        },
+                        style = Type.title, color = c.onInverse,
+                    )
                 }
             }) {
                 Text(if (cue != null) "세우는 곳" else "다음 지점", style = Type.title, color = c.onInverse.copy(alpha = 0.8f))
-                Text(if (cue != null) spotName(plan) else point, style = Type.headline, color = c.onInverse)
+                Text(if (cue != null) spotName(plan) else point, style = Type.hero, color = c.onInverse)
             }
             Panel(Modifier.weight(1f)) {
                 Text("${walkPrefix(plan)} 이렇게 가요", style = Type.label, color = c.inkMuted)
                 RouteStrip(point, plan.name, plan.type == CandidateType.DROPOFF, entrance?.name ?: "입구", walk = null, compact = true)
                 Text(walkLabel(plan), style = Type.bodyStrong, color = c.ink)
                 if (plan.liveAvailabilitySource == null && plan.type == CandidateType.PARKING) ReasonLine("빈자리는 현장에서 확인해요", ReasonKind.CHECK)
+                EntranceImage(entrance?.photos?.firstOrNull(), illustration = entrance?.photoKind == app.atthedoor.domain.model.PhotoKind.ILLUSTRATION, contentDescription = "${entrance?.name ?: "입구"} 모습", modifier = Modifier.fillMaxWidth().aspectRatio(2f))
             }
         }
     }
@@ -445,7 +458,7 @@ private fun WalkingBody(state: TripUiState, open: (Sheet) -> Unit) {
     val phone = state.share is ShareState.Ready
     Column(verticalArrangement = Arrangement.spacedBy(28.dp)) {
         Headline(
-            if (phone) "휴대폰에서 안내하고 있어요" else "${entrance?.name ?: "입구"}까지 함께 가요",
+            if (phone) "휴대폰 링크로 이어서 안내해요" else "${Josa.euroRo(entrance?.name ?: "입구")} 가요",
             sub = if (phone) "입구에 닿으면 휴대폰이나 이 화면에서 ‘입구에 도착했어요’를 눌러 주세요" else null,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(Gap)) {
@@ -475,10 +488,13 @@ private fun VisitBody(state: TripUiState, open: (Sheet) -> Unit) {
             if (note != null) Text(note, style = Type.hero, color = c.ink, modifier = Modifier.padding(top = 8.dp))
             Spacer(Modifier.height(24.dp))
             Hairline()
-            if (note == null) {
-                ListRow("층과 구역 남기기", subtitle = "돌아올 때 찾기 쉬워요", leading = { Icon(Glyph.Parking, null, Modifier.size(40.dp), tint = c.ink) }, onClick = { open(Sheet.PARKING_NOTE) })
-                Hairline()
-            }
+            ListRow(
+                if (note == null) "층과 구역 · 지금 남기기" else "층과 구역 · $note",
+                subtitle = if (note == null) "돌아올 때 찾기 쉬워요" else null,
+                leading = { Icon(Glyph.Parking, null, Modifier.size(40.dp), tint = c.ink) },
+                onClick = { open(Sheet.PARKING_NOTE) },
+            )
+            Hairline()
             ListRow("이용한 입구 · 돌아갈 때 나갈 문", subtitle = state.selectedEntrance?.name ?: "입구", leading = { Icon(Glyph.Door, null, Modifier.size(40.dp), tint = c.ink) })
         }
     }
@@ -521,6 +537,8 @@ private fun NoAlternativeBody(state: TripUiState) {
     var showWhy by rememberSaveable { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(28.dp)) {
         Headline("확인된 대안이 없어요", sub = "같은 조건을 만족하는 계획을 찾지 못했어요. 없는 정보를 만들어 안내하지 않아요.")
+        val blocked = state.trip?.blockedEntranceIds.orEmpty().mapNotNull { state.venue?.entrance(it)?.name }
+        if (blocked.isNotEmpty()) ReasonLine("${blocked.joinToString("·")} 모두 이용할 수 없다고 알려 주셨어요", ReasonKind.BLOCK)
         Panel(Modifier.fillMaxWidth(), padding = 40.dp) {
             Text("시설에 문의해 보세요", style = Type.title, color = c.ink)
             val v = state.venue
@@ -552,7 +570,7 @@ private fun DoneBody(state: TripUiState, vm: TripViewModel) {
             Text("안내와 다른 곳이 있었나요? 여러 개 골라도 돼요", style = Type.title, color = c.ink)
             Row(horizontalArrangement = Arrangement.spacedBy(Gap)) {
                 listOf(FeedbackKind.ENTRANCE to Glyph.Door, FeedbackKind.ROUTE to Glyph.Walk, FeedbackKind.PARKING to Glyph.Parking).forEach { (k, icon) ->
-                    ChoiceTile(k.label, null, selected = k in state.feedbackDraft, onClick = { vm.toggleFeedback(k) }, modifier = Modifier.weight(1f).heightIn(min = 200.dp), icon = icon)
+                    ChoiceTile(k.label, null, selected = k in state.feedbackDraft, onClick = { vm.toggleFeedback(k) }, modifier = Modifier.weight(1f).heightIn(min = 200.dp), icon = icon, multi = true)
                 }
             }
             Text("제보는 이 차에만 남고, 검증 전에는 다른 사람의 계획에 반영하지 않아요.", style = Type.caption, color = c.inkMuted)

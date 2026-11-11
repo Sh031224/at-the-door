@@ -24,6 +24,8 @@ export interface CreateTripRequest {
   walkSummary: string;
   /** 차량이 같은 조건의 대안을 찾지 못한 상태(NEEDS_CHECK)면 true. 휴대폰은 시설 연락 화면으로 바뀐다 */
   noAlternative: boolean;
+  /** 재계획으로 길이 바뀌었을 때 휴대폰 위에 보여 줄 한 줄. 예: "후문을 이용할 수 없어 정문으로 가는 길로 바꿨어요" */
+  changeNote: string | null;
   /** 대안이 없을 때 보여 줄 시설 연락처 */
   contact: string | null;
 }
@@ -71,7 +73,7 @@ export function isCreateTripRequest(v: unknown): v is CreateTripRequest {
     str("venueName") && str("planName") && str("entranceName") && str("evidenceLabel") &&
     strArr("entrancePhotos") && strArr("steps") && strArr("returnSteps") &&
     typeof o.photosAreIllustrations === "boolean" && typeof o.demo === "boolean" &&
-    str("walkSummary") && typeof o.noAlternative === "boolean" &&
+    str("walkSummary") && typeof o.noAlternative === "boolean" && (o.changeNote === null || str("changeNote")) &&
     (o.parkingNote === null || str("parkingNote")) &&
     (o.contact === null || str("contact"))
   );

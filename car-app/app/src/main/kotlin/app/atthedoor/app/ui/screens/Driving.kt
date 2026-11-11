@@ -51,9 +51,9 @@ fun DrivingScreen(state: TripUiState, onParkingFull: () -> Unit) {
     val phase = state.trip?.phase
     Column(Modifier.fillMaxSize().background(c.bg)) {
         state.replanned?.let { NoticeStrip(it, Tone.SUCCESS, large = true) }
-        Column(Modifier.weight(1f).padding(horizontal = 48.dp, vertical = 40.dp), verticalArrangement = Arrangement.spacedBy(32.dp, Alignment.CenterVertically)) {
+        Column(Modifier.weight(1f).padding(horizontal = 48.dp, vertical = 48.dp), verticalArrangement = Arrangement.spacedBy(32.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("문앞 · 2 가는 중", style = Type.title, color = c.inkMuted)
+                Text("문앞 · ${drivingStage(phase)}", style = Type.title, color = c.inkMuted)
                 Spacer(Modifier.width(20.dp))
                 if (state.venue?.demo == true) DemoBadge(large = true)
             }
@@ -100,7 +100,11 @@ fun DrivingScreen(state: TripUiState, onParkingFull: () -> Unit) {
                 }
             }
         }
-        if (phase == TripPhase.APPROACHING) {
+        // 만차 제보는 내비가 도착을 알린 뒤에만 연다. 목적지에서 먼 주행 중에는 누를 거리를 두지 않는다.
+        if (phase == TripPhase.APPROACHING && !state.naviArrived) {
+            Text("만차면 도착한 뒤 알려 주세요", Modifier.padding(horizontal = 48.dp, vertical = 32.dp), style = Type.driveSub, color = c.inkMuted)
+        }
+        if (phase == TripPhase.APPROACHING && state.naviArrived) {
             AtdButton(
                 "만차예요 · 다른 곳 찾기",
                 onParkingFull,
@@ -112,6 +116,14 @@ fun DrivingScreen(state: TripUiState, onParkingFull: () -> Unit) {
             )
         }
     }
+}
+
+/** 상단 4단계와 같은 이름으로 주행 화면 머리글을 만든다. */
+private fun drivingStage(phase: TripPhase?): String = when (phase) {
+    null, TripPhase.PLANNING, TripPhase.CHOOSING, TripPhase.NAVI_REQUESTED, TripPhase.NEEDS_CHECK -> "1 준비"
+    TripPhase.APPROACHING -> "2 가는 중"
+    TripPhase.PARKED, TripPhase.WALKING, TripPhase.VISITING, TripPhase.REPLANNING -> "3 입구까지"
+    TripPhase.RETURNING, TripPhase.COMPLETED, TripPhase.CANCELLED -> "4 돌아오기"
 }
 
 /** 모의 응답 모드 전용. 실제 SDK 모드에서는 에뮬레이터 Virtual Console로 같은 신호를 바꾼다. */

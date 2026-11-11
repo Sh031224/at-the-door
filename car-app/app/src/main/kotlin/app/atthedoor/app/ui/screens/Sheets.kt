@@ -72,7 +72,6 @@ fun BoxScope.Sheets(sheet: Sheet, state: TripUiState, vm: TripViewModel, onClose
         }) {
             ConditionsEditor(state.draft, vm::updateDraft)
             Text("도착 예정 시각", style = Type.title, color = Atd.colors.ink)
-            Text("운영·출입 시간 판정에 써요", style = Type.caption, color = Atd.colors.inkMuted)
             @OptIn(ExperimentalLayoutApi::class)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Arrival.entries.forEach { a -> AtdChip(a.label, state.arrival == a, { vm.setArrival(a) }) }
@@ -226,8 +225,7 @@ fun ConditionsEditor(c: TravelConditions, onChange: (TravelConditions) -> Unit) 
     }
     Text("주차", style = Type.title, color = col.ink)
     AtdChip(Labels.PERMIT, c.hasDisabledParkingPermit, { onChange(c.copy(hasDisabledParkingPermit = !c.hasDisabledParkingPermit)) })
-    Text("표지가 없으면 장애인 전용 구역은 후보에서 빼요.", style = Type.caption, color = col.inkMuted)
-    Text("고른 것만 반영해요. 보조기구와 자격 정보는 이 차에만 있어요.", style = Type.caption, color = col.inkMuted)
+    Text("고른 것만 반영하고 이 차에만 저장해요.", style = Type.caption, color = col.inkMuted)
 }
 
 /** 주차 위치 프리셋. 층은 시설 데이터의 이 구역 층으로 좁히고, 칸 번호는 휴대폰에서 적는다. */

@@ -41,7 +41,7 @@ class FakeNaviPort(
             FakeNaviScenario.SUCCESS -> {
                 send(NaviResult.Searching)
                 delay(stepDelayMs)
-                send(NaviResult.Guiding)
+                send(NaviResult.Guiding(durationSec = 1140, distanceM = 13000))
             }
             FakeNaviScenario.FAIL -> send(NaviResult.Failed("FAKE_SEARCH_ROUTE"))
             FakeNaviScenario.TIMEOUT -> {
