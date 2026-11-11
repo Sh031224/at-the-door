@@ -11,16 +11,11 @@ import ai.pleos.playground.vehicle.listener.GearSelectionListener
 import ai.pleos.playground.vehicle.listener.SeatBeltBuckledStateListener
 import ai.pleos.playground.vehicle.listener.SeatOccupancyListener
 import android.content.Context
-import app.atthedoor.domain.port.DoorEvent
+import android.util.Log
 import app.atthedoor.domain.port.GearState
-import app.atthedoor.domain.port.SeatPosition
 import app.atthedoor.domain.port.VehicleSignalPort
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
@@ -35,8 +30,8 @@ class PleosVehicleSignalPort(context: Context) : VehicleSignalPort {
     private val _gear = MutableStateFlow<GearState?>(null)
     override val gear: StateFlow<GearState?> = _gear.asStateFlow()
 
-    private val _doorEvents = MutableSharedFlow<DoorEvent>(extraBufferCapacity = 8, onBufferOverflow = BufferOverflow.DROP_OLDEST)
-    override val doorEvents: SharedFlow<DoorEvent> = _doorEvents.asSharedFlow()
+    private val _doorOpen = MutableStateFlow<Boolean?>(null)
+    override val frontPassengerDoorOpen: StateFlow<Boolean?> = _doorOpen.asStateFlow()
 
     private val _occupied = MutableStateFlow<Boolean?>(null)
     override val frontPassengerOccupied: StateFlow<Boolean?> = _occupied.asStateFlow()
@@ -49,21 +44,26 @@ class PleosVehicleSignalPort(context: Context) : VehicleSignalPort {
 
     private val gearListener = object : GearSelectionListener {
         override fun onSelected(gear: VehicleGear?) {
+            Log.d(TAG, "gear=$gear")
             _gear.value = gear?.toState()
         }
 
         override fun onFailed(exception: Exception) {
+            Log.w(TAG, "gear failed", exception)
             _gear.value = null
         }
     }
 
     private val doorListener = object : DoorPositionListener {
         override fun onPositionUpdated(position: Int?) {
-            val p = position ?: return
-            _doorEvents.tryEmit(if (p > 0) DoorEvent.Opened(SeatPosition.FRONT_PASSENGER) else DoorEvent.Closed(SeatPosition.FRONT_PASSENGER))
+            Log.d(TAG, "door position=$position")
+            _doorOpen.value = position?.let { it > 0 }
         }
 
-        override fun onFailed(exception: Exception) = Unit
+        override fun onFailed(exception: Exception) {
+            Log.w(TAG, "door failed", exception)
+            _doorOpen.value = null
+        }
     }
 
     private val occupancyListener = object : SeatOccupancyListener {
@@ -78,6 +78,7 @@ class PleosVehicleSignalPort(context: Context) : VehicleSignalPort {
 
     private val beltListener = object : SeatBeltBuckledStateListener {
         override fun onSeatBeltBuckledStateUpdated(buckled: Boolean?) {
+            Log.d(TAG, "passenger belt buckled=$buckled")
             _buckled.value = buckled
         }
 
@@ -86,7 +87,7 @@ class PleosVehicleSignalPort(context: Context) : VehicleSignalPort {
         }
     }
 
-    fun start() {
+    fun start() = runCatching {
         vehicle.initialize()
         vehicle.getGear().registerGearSelection(gearListener)
         vehicle.getDoor().registerDoorPosition(passengerDoor, doorListener)
@@ -101,7 +102,7 @@ class PleosVehicleSignalPort(context: Context) : VehicleSignalPort {
                 vehicle.getSeat().registerSeatBeltBuckledState(passengerSeat, beltListener)
             }
         }, { _buckled.value = null })
-    }
+    }.onFailure { Log.w(TAG, "vehicle signals unavailable", it) }
 
     fun stop() {
         runCatching { vehicle.getGear().unregisterGearSelection(gearListener) }
@@ -109,6 +110,10 @@ class PleosVehicleSignalPort(context: Context) : VehicleSignalPort {
         runCatching { vehicle.getSeat().unregisterSeatOccupancy(passengerSeat, occupancyListener) }
         runCatching { vehicle.getSeat().unregisterSeatBeltBuckledState(passengerSeat, beltListener) }
         vehicle.release()
+    }
+
+    private companion object {
+        const val TAG = "AtTheDoor.Vehicle"
     }
 
     private fun VehicleGear.toState(): GearState = when (this) {

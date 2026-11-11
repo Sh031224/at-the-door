@@ -18,7 +18,7 @@ import java.net.URL
  */
 class HttpSharePort(private val baseUrl: String, private val timeoutMs: Int = 5_000) : SharePort {
 
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json { ignoreUnknownKeys = true; explicitNulls = true; encodeDefaults = true }
 
     @Serializable
     private data class CreateTripRequest(
@@ -26,10 +26,17 @@ class HttpSharePort(private val baseUrl: String, private val timeoutMs: Int = 5_
         val planName: String,
         val entranceName: String,
         val entrancePhotos: List<String>,
+        val photosAreIllustrations: Boolean,
         val steps: List<String>,
-        val conditionLabels: List<String>,
+        val returnSteps: List<String>,
         val parkingNote: String?,
         val evidenceLabel: String,
+        val demo: Boolean,
+        val contact: String?,
+    )
+
+    private fun TripSnapshot.dto() = CreateTripRequest(
+        venueName, planName, entranceName, entrancePhotos, photosAreIllustrations, steps, returnSteps, parkingNote, evidenceLabel, demo, contact,
     )
 
     @Serializable
@@ -42,19 +49,22 @@ class HttpSharePort(private val baseUrl: String, private val timeoutMs: Int = 5_
     private data class TripStatusResponse(val events: List<EventDto>)
 
     override suspend fun createLink(snapshot: TripSnapshot): ShareLink? = runCatching {
-        val body = json.encodeToString(
-            CreateTripRequest.serializer(),
-            with(snapshot) { CreateTripRequest(venueName, planName, entranceName, entrancePhotos, steps, conditionLabels, parkingNote, evidenceLabel) },
-        )
+        val body = json.encodeToString(CreateTripRequest.serializer(), snapshot.dto())
         val res = json.decodeFromString(CreateTripResponse.serializer(), request("POST", "/api/trips", body))
         ShareLink(res.token, res.url, res.expiresAt)
     }.getOrNull()
+
+    override suspend fun update(token: String, snapshot: TripSnapshot): Boolean = runCatching {
+        request("PUT", "/api/trips/$token", json.encodeToString(CreateTripRequest.serializer(), snapshot.dto()))
+        true
+    }.getOrDefault(false)
 
     override suspend fun pollEvents(token: String): List<ReceivedPhoneEvent> = runCatching {
         json.decodeFromString(TripStatusResponse.serializer(), request("GET", "/api/trips/$token", null))
             .events.mapNotNull { e ->
                 val event = when (e.type) {
                     "arrived" -> PhoneEvent.Arrived
+                    "arrival_undone" -> PhoneEvent.ArrivalUndone
                     "entrance_blocked" -> PhoneEvent.EntranceBlocked
                     "returning" -> PhoneEvent.Returning
                     "parking_note" -> e.note?.let { PhoneEvent.ParkingNote(it) }

@@ -2,7 +2,6 @@ package app.atthedoor.platform.fake
 
 import app.atthedoor.domain.model.AccessPoint
 import app.atthedoor.domain.model.GeoPoint
-import app.atthedoor.domain.port.DoorEvent
 import app.atthedoor.domain.port.DrivingStatePort
 import app.atthedoor.domain.port.GearState
 import app.atthedoor.domain.port.LocationPort
@@ -13,8 +12,8 @@ import app.atthedoor.domain.port.SpeechText
 import app.atthedoor.domain.port.VehicleSignalPort
 import app.atthedoor.domain.port.VoicePort
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 
@@ -31,18 +30,31 @@ class FakeNaviPort(
 ) : NaviPort {
     val requested = mutableListOf<AccessPoint>()
 
-    override fun requestRoute(target: AccessPoint): Flow<NaviResult> = flow {
+    /** 시연 제어에서 ‘내비 안내 취소’를 누르면 진행 중인 요청에 Cancelled를 흘려보낸다. */
+    private val external = kotlinx.coroutines.flow.MutableSharedFlow<NaviResult>(extraBufferCapacity = 4)
+
+    override fun requestRoute(target: AccessPoint): Flow<NaviResult> = kotlinx.coroutines.flow.channelFlow {
         requested += target
+        launch { external.collect { send(it) } }
         delay(stepDelayMs)
         when (scenario) {
             FakeNaviScenario.SUCCESS -> {
-                emit(NaviResult.Searching)
+                send(NaviResult.Searching)
                 delay(stepDelayMs)
-                emit(NaviResult.Guiding)
+                send(NaviResult.Guiding)
             }
-            FakeNaviScenario.FAIL -> emit(NaviResult.Failed("FAKE_SEARCH_ROUTE"))
-            FakeNaviScenario.TIMEOUT -> emit(NaviResult.TimedOut)
+            FakeNaviScenario.FAIL -> send(NaviResult.Failed("FAKE_SEARCH_ROUTE"))
+            FakeNaviScenario.TIMEOUT -> {
+                send(NaviResult.Searching)
+                delay(stepDelayMs * 3)
+                send(NaviResult.TimedOut)
+            }
         }
+        kotlinx.coroutines.awaitCancellation()
+    }
+
+    fun simulate(result: NaviResult) {
+        external.tryEmit(result)
     }
 
     override fun cancel() = Unit
@@ -58,9 +70,10 @@ class FakeDrivingStatePort(restricted: Boolean = false) : DrivingStatePort {
     }
 }
 
+/** 시연 제어 패널에서 기어·벨트·도어를 바꾼다. 처음에는 주행 준비 상태(D, 벨트 체결, 문 닫힘)로 둔다. */
 class FakeVehicleSignalPort : VehicleSignalPort {
     override val gear = MutableStateFlow<GearState?>(GearState.PARK)
-    override val doorEvents = MutableSharedFlow<DoorEvent>(extraBufferCapacity = 8)
+    override val frontPassengerDoorOpen = MutableStateFlow<Boolean?>(false)
     override val frontPassengerOccupied = MutableStateFlow<Boolean?>(true)
     override val frontPassengerBuckled = MutableStateFlow<Boolean?>(true)
 }
