@@ -49,6 +49,27 @@ class TripMachineTest {
     }
 
     @Test
+    fun `걷다가 대안이 없어도 차로 돌아갈 수 있고 막힘 표시를 되돌릴 수 있다`() {
+        val stuck = approaching()
+            .on(TripEvent.ParkingConfirmed(drivingRestricted = false))
+            .on(TripEvent.WalkStarted)
+            .on(TripEvent.EntranceBlocked("rear"))
+            .on(TripEvent.NoAlternative)
+        assertEquals(TripPhase.NEEDS_CHECK, stuck.phase)
+        assertEquals(TripPhase.RETURNING, stuck.on(TripEvent.ReturnStarted).phase)
+        val reopened = stuck.on(TripEvent.EntranceReopened("rear"))
+        assertEquals(TripPhase.REPLANNING, reopened.phase)
+        assertEquals(TripPhase.WALKING, reopened.resumePhase)
+        assertEquals(emptySet(), reopened.blockedEntranceIds)
+    }
+
+    @Test
+    fun `차로 이동하기 전 대안이 없으면 차로 돌아가기는 받지 않는다`() {
+        val t = Trip.start("t1", "v").on(TripEvent.ConditionsConfirmed(soloGuardian))
+        assertEquals(TripPhase.CHOOSING, t.on(TripEvent.ReturnStarted).phase)
+    }
+
+    @Test
     fun `계획과 다른 후보 지점에 세웠다고 알리면 그 지점의 동선으로 이어 간다`() {
         val t = approaching().on(TripEvent.ParkingConfirmed(drivingRestricted = false, candidateId = "C"))
         assertEquals(TripPhase.PARKED, t.phase)

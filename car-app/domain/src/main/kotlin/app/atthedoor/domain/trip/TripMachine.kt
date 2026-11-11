@@ -46,6 +46,8 @@ sealed interface TripEvent {
     data class CandidateUnavailable(val candidateId: String) : TripEvent
     /** 건물 입구 폐쇄 제보. 같은 입구로 가는 모든 후보가 영향을 받는다. */
     data class EntranceBlocked(val entranceId: String) : TripEvent
+    /** ‘막혀 있어요’를 잘못 눌렀거나 다시 열렸을 때. 막힘 표시를 지우고 다시 평가한다. */
+    data class EntranceReopened(val entranceId: String) : TripEvent
     data class ConditionsChanged(val conditions: TravelConditions) : TripEvent
     /**
      * 재계획 결과: 같은 조건을 만족하는 대안.
@@ -119,7 +121,12 @@ object TripMachine {
 
         TripEvent.ArrivalUndone -> if (t.phase == VISITING) t.copy(phase = WALKING, notice = null) else null
 
-        TripEvent.ReturnStarted -> if (t.phase == VISITING) t.copy(phase = RETURNING, notice = null) else null
+        TripEvent.ReturnStarted -> when {
+            t.phase == VISITING -> t.copy(phase = RETURNING, notice = null)
+            // 걷다가 대안이 없으면 사람은 입구 앞에 있다. 차로 돌아가는 길은 언제나 열어 둔다.
+            t.phase == NEEDS_CHECK && t.resumePhase?.onFoot == true -> t.copy(phase = RETURNING, resumePhase = null, notice = null)
+            else -> null
+        }
 
         TripEvent.BackInCar -> if (t.phase == RETURNING) t.copy(phase = COMPLETED, notice = null) else null
 
@@ -156,7 +163,13 @@ object TripMachine {
             } else null
 
         TripEvent.NoAlternative ->
-            if (t.phase == REPLANNING) t.copy(phase = NEEDS_CHECK, resumePhase = null) else null
+            // 어디서 막혔는지(걷는 중인지)는 남겨 둔다. 차로 돌아가기와 막힘 되돌리기에 쓴다.
+            if (t.phase == REPLANNING) t.copy(phase = NEEDS_CHECK) else null
+
+        is TripEvent.EntranceReopened ->
+            if (t.phase in setOf(NEEDS_CHECK, WALKING, RETURNING) && e.entranceId in t.blockedEntranceIds) {
+                replanning(t, t.copy(blockedEntranceIds = t.blockedEntranceIds - e.entranceId))
+            } else null
 
         TripEvent.Resumed -> when (t.phase) {
             // 내비 요청 결과를 받던 리스너는 앱과 함께 사라졌다. 선택은 유지하고 다시 요청하게 한다.
@@ -175,7 +188,7 @@ object TripMachine {
     }
 
     private fun replanning(before: Trip, changed: Trip): Trip = changed.copy(
-        resumePhase = resumeAfterReplan(before.phase),
+        resumePhase = if (before.phase == NEEDS_CHECK) before.resumePhase ?: CHOOSING else resumeAfterReplan(before.phase),
         phase = REPLANNING,
         notice = null,
     )

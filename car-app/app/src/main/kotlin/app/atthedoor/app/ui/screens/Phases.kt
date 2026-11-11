@@ -123,7 +123,7 @@ fun PhaseBody(state: TripUiState, vm: TripViewModel, setupBlocked: Boolean, cue:
             Spacer(Modifier.width(28.dp))
             Text("같은 조건으로 다른 계획을 찾고 있어요", style = Type.headline, color = Atd.colors.ink)
         }
-        TripPhase.NEEDS_CHECK -> NoAlternativeBody(state)
+        TripPhase.NEEDS_CHECK -> NoAlternativeBody(state, vm)
         TripPhase.COMPLETED, TripPhase.CANCELLED -> DoneBody(state, vm)
     }
 }
@@ -156,10 +156,13 @@ fun phaseActions(state: TripUiState, vm: TripViewModel, cb: PhaseCallbacks, open
         // 도착 신호(기어 P 변화, 내비 도착) 전에는 ‘주차했어요’를 맨 앞에 두지 않는다. 출발 직후 잘못 누르지 않게 한다.
         TripPhase.APPROACHING -> if (cb.cue != null || state.naviArrived) {
             Segment("주차했어요", { vm.confirmParking(null) }, SegmentKind.PRIMARY, Glyph.Check) to
-                listOf(Segment("만차예요 · 다른 곳 찾기", vm::reportParkingFull, SegmentKind.REPORT, Glyph.Warning))
+                listOf(
+                    Segment("다른 곳에 세웠어요", { open(Sheet.PARKED_ELSEWHERE) }, icon = Glyph.Parking),
+                    Segment("만차예요 · 다른 곳 찾기", vm::reportParkingFull, SegmentKind.REPORT, Glyph.Warning),
+                )
         } else {
-            Segment("내비 화면 보기", cb.openNavi, SegmentKind.PRIMARY, Glyph.Navigate) to
-                listOf(Segment("주차했어요", { vm.confirmParking(null) }, icon = Glyph.Check))
+            // 멀리 있을 때는 ‘주차했어요’를 바에 두지 않는다(⋯ 안에만). 신호 대기 중 잘못 누르지 않게 한다.
+            Segment("내비 화면 보기", cb.openNavi, SegmentKind.PRIMARY, Glyph.Navigate) to emptyList()
         }
         TripPhase.PARKED -> Segment("입구로 출발", vm::startWalking, SegmentKind.PRIMARY, Glyph.Walk) to
             listOfNotNull(Segment("휴대폰 없이 진행", vm::skipPhone).takeIf { state.share is ShareState.Ready })
@@ -171,9 +174,13 @@ fun phaseActions(state: TripUiState, vm: TripViewModel, cb: PhaseCallbacks, open
         TripPhase.REPLANNING -> null
         TripPhase.NEEDS_CHECK -> {
             val contact = state.venue?.contact
-            if (contact != null) Segment("시설에 전화", { cb.dial(contact) }, SegmentKind.PRIMARY, Glyph.Phone) to
-                listOf(Segment("조건 바꾸기", { open(Sheet.CHANGE) }, icon = Glyph.Edit), Segment("새로 계획하기", vm::startOver))
-            else Segment("조건 바꾸기", { open(Sheet.CHANGE) }, SegmentKind.PRIMARY, Glyph.Edit) to listOf(Segment("새로 계획하기", vm::startOver))
+            val onFoot = state.trip.resumePhase?.onFoot == true
+            val back = Segment("차로 돌아가기", vm::startReturn, icon = Glyph.Car).takeIf { onFoot }
+            val change = Segment("조건 바꾸기", { open(Sheet.CHANGE) }, icon = Glyph.Edit)
+            // 새로 계획하기는 ⋯에 있다. 입구 앞에 선 사람에게는 전화와 돌아가는 길이 먼저다.
+            if (contact != null) Segment("시설에 전화", { cb.dial(contact) }, SegmentKind.PRIMARY, Glyph.Phone) to listOfNotNull(back, change)
+            else if (back != null) back.copy(kind = SegmentKind.PRIMARY) to listOf(change)
+            else change.copy(kind = SegmentKind.PRIMARY) to listOf(Segment("새로 계획하기", vm::startOver, icon = Glyph.Refresh))
         }
         TripPhase.COMPLETED -> if (state.trip.feedback == null) {
             val n = state.feedbackDraft.size
@@ -214,7 +221,7 @@ private fun PlanningBody(state: TripUiState, vm: TripViewModel, open: (Sheet) ->
         VoiceFeedback(state)
         Panel(Modifier.fillMaxWidth(), padding = 28.dp, spacing = 16.dp) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("나머지 조건", style = Type.label, color = c.inkMuted)
+                Text("이동 조건", style = Type.label, color = c.inkMuted)
                 Spacer(Modifier.width(24.dp))
                 Text(summaryChips(d, state.arrival.label).joinToString("  ·  "), Modifier.weight(1f).clickable { open(Sheet.CONDITIONS) }, style = Type.bodyStrong, color = c.ink)
                 AtdButton("바꾸기", { open(Sheet.CONDITIONS) }, kind = ButtonKind.QUIET, trailing = Glyph.Chevron, height = 88.dp)
@@ -358,7 +365,7 @@ private fun ApproachBody(state: TripUiState, cue: HandoffCue?) {
     val entrance = state.selectedEntrance
     Column(verticalArrangement = Arrangement.spacedBy(28.dp)) {
         val point = shortPoint(plan.accessPoint.approach, state.venue)
-        if (cue != null) Headline(if (state.naviArrived) "주차했나요?" else "여기에 주차했나요?", sub = "${cue.message}\n다른 곳에 세웠으면 오른쪽 위 ⋯에서 ‘다른 곳에 세웠어요’를 골라 주세요.")
+        if (cue != null) Headline(if (state.naviArrived) "주차했나요?" else "여기에 주차했나요?", sub = cue.message)
         else Headline(state.route?.label?.let { "가고 있어요 · $it" } ?: "가고 있어요", sub = "${plan.name} · 안내를 시작할 때 내비가 알려 준 예상이에요".takeIf { state.route?.label != null } ?: plan.name)
         Row(horizontalArrangement = Arrangement.spacedBy(Gap)) {
             InverseBlock(Modifier.width(760.dp), sub = {
@@ -445,7 +452,7 @@ private fun ParkedBody(state: TripUiState, vm: TripViewModel, setupBlocked: Bool
 private fun ParkingNoteRow(note: String?, onClick: () -> Unit) {
     ListRow(
         title = note ?: "주차 위치 남기기 (선택)",
-        subtitle = if (note == null) "층과 구역은 위성 위치로 알 수 없어 직접 골라요" else "주차 위치",
+        subtitle = if (note == null) "층과 구역은 차가 알 수 없어 직접 골라요" else "주차 위치",
         leading = { Icon(Glyph.Parking, null, tint = Atd.colors.ink, modifier = Modifier.size(40.dp)) },
         onClick = onClick,
     )
@@ -539,13 +546,18 @@ private fun ReturnBody(state: TripUiState) {
 // ── X2 대안 없음 ───────────────────────────────────────
 
 @Composable
-private fun NoAlternativeBody(state: TripUiState) {
+private fun NoAlternativeBody(state: TripUiState, vm: TripViewModel) {
     val c = Atd.colors
     var showWhy by rememberSaveable { mutableStateOf(false) }
+    val onFoot = state.trip?.resumePhase?.onFoot == true
     Column(verticalArrangement = Arrangement.spacedBy(28.dp)) {
-        Headline("확인된 대안이 없어요", sub = "같은 조건을 만족하는 계획을 찾지 못했어요. 없는 정보를 만들어 안내하지 않아요.")
+        Headline(if (onFoot) "확인된 다른 입구가 없어요" else "확인된 대안이 없어요", sub = "같은 조건을 만족하는 계획을 찾지 못했어요. 없는 정보를 만들어 안내하지 않아요.")
         val blocked = state.trip?.blockedEntranceIds.orEmpty().mapNotNull { state.venue?.entrance(it)?.name }
         if (blocked.isNotEmpty()) ReasonLine("${blocked.joinToString("·")} 모두 이용할 수 없다고 알려 주셨어요", ReasonKind.BLOCK)
+        val last = state.selectedEntrance?.name
+        if (onFoot && last != null && state.selected?.walk?.toEntranceId in state.trip?.blockedEntranceIds.orEmpty()) {
+            AtdButton("다시 보니 ${Josa.iGa(last)} 열려 있어요 · 계속 안내", vm::reopenEntrance, kind = ButtonKind.SECONDARY, icon = Glyph.Refresh, height = 88.dp)
+        }
         Panel(Modifier.fillMaxWidth(), padding = 40.dp) {
             Text("시설에 문의해 보세요", style = Type.title, color = c.ink)
             val v = state.venue

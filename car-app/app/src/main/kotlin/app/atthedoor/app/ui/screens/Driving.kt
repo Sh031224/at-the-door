@@ -72,9 +72,10 @@ fun DrivingScreen(state: TripUiState, onParkingFull: () -> Unit) {
                     // 턴바이턴처럼 지금 향하는 곳을 가장 크게, 계획 이름은 그 아래에 둔다.
                     InverseBlock(Modifier.fillMaxWidth(), sub = {
                         Column {
-                            state.route?.label?.takeIf { phase == TripPhase.APPROACHING }?.let { Text("남은 길 $it", style = Type.driveSub.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold), color = c.onInverse) }
                             Text(plan.name, style = Type.driveSub, color = c.onInverse)
-                            plan.walk.distanceM.takeIf { it.known }?.let { Text("${walkPrefix(plan)} 입구까지 약 ${it.value}m", style = Type.title, color = c.onInverse.copy(alpha = 0.85f)) }
+                            plan.walk.distanceM.takeIf { it.known }?.let { Text("${walkPrefix(plan)} 입구까지 약 ${it.value}m", style = Type.driveSub.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold), color = c.onInverse) }
+                            // 실시간 남은 거리는 받지 않는다. 안내 시작 때 받은 값임을 그대로 밝힌다.
+                            state.route?.label?.takeIf { phase == TripPhase.APPROACHING }?.let { Text("출발 때 예상 $it", style = Type.title, color = c.onInverse.copy(alpha = 0.85f)) }
                         }
                     }) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -99,12 +100,12 @@ fun DrivingScreen(state: TripUiState, onParkingFull: () -> Unit) {
                             color = c.ink,
                         )
                     }
+                    // 만차 제보는 내비가 도착을 알린 뒤에만 연다. 그 전에는 안내만 한다.
+                    if (phase == TripPhase.APPROACHING && !state.naviArrived) {
+                        Text("만차면 도착한 뒤 알려 주세요", style = Type.driveSub, color = c.ink)
+                    }
                 }
             }
-        }
-        // 만차 제보는 내비가 도착을 알린 뒤에만 연다. 목적지에서 먼 주행 중에는 누를 거리를 두지 않는다.
-        if (phase == TripPhase.APPROACHING && !state.naviArrived) {
-            Text("만차면 도착한 뒤 알려 주세요", Modifier.padding(horizontal = 48.dp, vertical = 32.dp), style = Type.driveSub, color = c.inkMuted)
         }
         if (phase == TripPhase.APPROACHING && state.naviArrived) {
             AtdButton(

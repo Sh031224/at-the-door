@@ -94,7 +94,7 @@ fun TripScreen(vm: TripViewModel, onSwitchMode: () -> Unit) {
                         onMore = { sheet = Sheet.MORE },
                         onLogoLongPress = { sheet = Sheet.DEMO },
                     )
-                    Notices(state)
+                    Notices(state, vm::undoHint)
                     val scroll = rememberScrollState()
                     LaunchedEffect(state.trip?.phase, state.trip?.conditions, state.replanned) { scroll.scrollTo(0) }
                     Box(Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll).padding(horizontal = Grid.margin, vertical = 36.dp)) {
@@ -109,16 +109,20 @@ fun TripScreen(vm: TripViewModel, onSwitchMode: () -> Unit) {
 }
 
 @Composable
-private fun Notices(state: TripUiState) {
+private fun Notices(state: TripUiState, onUndoHint: () -> Unit) {
     val notice = state.trip?.notice?.takeIf { !(it == TripMachine.NOTICE_ALTERNATIVE && state.replanned != null) }
     // 막힘·만차로 길이 바뀐 것은 ‘성공’이 아니라 알림이다. 초록은 사용자가 고른 조건이 반영됐을 때만 쓴다.
     if (notice != null) NoticeStrip(notice, if (notice == TripMachine.NOTICE_ALTERNATIVE) Tone.INFO else Tone.CAUTION)
-    state.replanned?.let { NoticeStrip(it, Tone.INFO) }
+    state.replanned?.let {
+        NoticeStrip(it, Tone.INFO, action = if (state.hintUndo != null) ({
+            app.atthedoor.app.ui.components.AtdButton("되돌리기", onUndoHint, kind = app.atthedoor.app.ui.components.ButtonKind.QUIET, height = 72.dp)
+        }) else null)
+    }
 }
 
 private fun stageOf(state: TripUiState): Stage = when (state.trip?.phase) {
     // 주차한 뒤 대안을 못 찾았으면 사람은 여전히 입구 근처에 있다. 단계 표시를 ‘준비’로 되돌리지 않는다.
-    TripPhase.NEEDS_CHECK -> if (state.trip.parkedAt != null || state.trip.parkingNote != null) Stage.WALK else Stage.PREPARE
+    TripPhase.NEEDS_CHECK -> if (state.trip.resumePhase?.onFoot == true) Stage.WALK else Stage.PREPARE
     null, TripPhase.PLANNING, TripPhase.CHOOSING, TripPhase.NAVI_REQUESTED -> Stage.PREPARE
     TripPhase.APPROACHING -> Stage.DRIVE
     TripPhase.PARKED, TripPhase.WALKING, TripPhase.VISITING, TripPhase.REPLANNING -> Stage.WALK

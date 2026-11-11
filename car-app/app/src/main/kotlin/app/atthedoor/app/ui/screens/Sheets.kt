@@ -99,7 +99,7 @@ fun BoxScope.Sheets(sheet: Sheet, state: TripUiState, vm: TripViewModel, onClose
                 val entranceName = state.venue?.entrance(r.candidate.walk.toEntranceId)?.name
                 ListRow(
                     entranceName?.let { "${spotName(r.candidate)} · ${Josa.euroRo(it)}" } ?: r.candidate.name,
-                    subtitle = if (r.selectable) "${walkPrefix(r.candidate)} 입구까지 ${walkLabel(r.candidate)}" else r.verdict.reasons.firstOrNull() ?: "확인 필요",
+                    subtitle = if (r.selectable) "입구까지 ${walkLabel(r.candidate)}" else "${r.verdict.reasons.firstOrNull() ?: "정보 없음"} · 확인 전에는 안내하지 않아요",
                     leading = { VerdictBadge(r.verdict.kind) },
                     trailing = if (r.selectable) ({ AtdButton("이 계획으로 안내", { vm.choosePlan(r.candidate); onClose() }, kind = ButtonKind.SECONDARY, height = 88.dp) }) else null,
                 )
@@ -144,6 +144,10 @@ fun BoxScope.Sheets(sheet: Sheet, state: TripUiState, vm: TripViewModel, onClose
         }
         Sheet.MORE -> SideSheet("더보기", onClose) {
             val phase = state.trip?.phase
+            if (phase == TripPhase.APPROACHING && !state.naviArrived) {
+                ListRow("주차했어요", subtitle = "내비 도착 전이라도 세웠으면 알려 주세요", leading = { Icon(Glyph.Check, null, Modifier.size(40.dp)) }, onClick = { vm.confirmParking(null); onClose() })
+                Hairline()
+            }
             if (phase == TripPhase.APPROACHING) {
                 ListRow("다른 곳에 세웠어요", subtitle = "실제로 세운 곳을 고르면 거기서 입구까지 다시 안내해요", leading = { Icon(Glyph.Parking, null, Modifier.size(40.dp)) }, onClick = { open(Sheet.PARKED_ELSEWHERE) })
                 Hairline()
@@ -180,8 +184,9 @@ fun BoxScope.Sheets(sheet: Sheet, state: TripUiState, vm: TripViewModel, onClose
         }
         Sheet.PARKED_ELSEWHERE -> SideSheet("어디에 세웠나요?", onClose) {
             // 위치 신호로 추정하지 않는다. 시설 데이터에 있는 지점 가운데 사람이 고른 곳만 받는다.
-            val selectedId = state.trip?.selectedCandidateId
-            val spots = state.evaluation?.results.orEmpty().filter { it.selectable && it.candidate.id != selectedId }
+            // 지금 계획과 같은 자리는 ‘다른 곳’이 아니다. 자리 이름으로 묶어 한 번씩만 보여 준다.
+            val planned = state.selected?.let(::spotName)
+            val spots = state.evaluation?.results.orEmpty().filter { it.selectable && spotName(it.candidate) != planned }.distinctBy { spotName(it.candidate) }
             Text("세운 곳을 고르면 그 자리에서 입구까지의 동선으로 바꿔요.", style = Type.body, color = Atd.colors.inkMuted)
             spots.forEach { r ->
                 val entranceName = state.venue?.entrance(r.candidate.walk.toEntranceId)?.name ?: "입구"
@@ -250,8 +255,11 @@ fun ConditionsEditor(c: TravelConditions, onChange: (TravelConditions) -> Unit) 
     FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         MobilityAid.entries.forEach { aid -> AtdChip(aid.label, c.mobilityAid == aid, { onChange(c.copy(mobilityAid = aid)) }) }
     }
-    Text("주차", style = Type.title, color = col.ink)
-    AtdChip(Labels.PERMIT, c.hasDisabledParkingPermit, { onChange(c.copy(hasDisabledParkingPermit = !c.hasDisabledParkingPermit)) })
+    Text("장애인 주차 표지", style = Type.title, color = col.ink)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        AtdChip("없음", !c.hasDisabledParkingPermit, { onChange(c.copy(hasDisabledParkingPermit = false)) })
+        AtdChip("있음", c.hasDisabledParkingPermit, { onChange(c.copy(hasDisabledParkingPermit = true)) })
+    }
     Text("고른 것만 반영하고 이 차에만 저장해요.", style = Type.caption, color = col.inkMuted)
 }
 

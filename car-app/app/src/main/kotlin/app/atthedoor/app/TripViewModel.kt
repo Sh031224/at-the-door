@@ -89,6 +89,8 @@ data class TripUiState(
     val voice: VoiceState = VoiceState(),
     /** 주행 중 재계획으로 계획이 바뀌었을 때 잠시 보여 줄 문구. 음성과 함께 화면에서도 바뀐 것을 알 수 있게 한다. */
     val replanned: String? = null,
+    /** 힌트로 조건을 바꿨을 때 되돌릴 이전 조건. 알림이 사라지면 함께 지운다. */
+    val hintUndo: TravelConditions? = null,
     /** 완료 화면에서 고르는 중인 제보. 하단 버튼 문구가 이 값을 따른다. */
     val feedbackDraft: Set<FeedbackKind> = emptySet(),
     /** 내비가 목적 지점 도착을 알림(onDestinationArrived). 사람의 도착이 아니라 ‘주차했어요’를 앞에 둘 시점의 참고 신호다. */
@@ -197,6 +199,24 @@ class TripViewModel(private val c: AppContainer) : ViewModel() {
                 ConditionHint.CONFIRM_PERMIT -> "‘장애인 주차 표지 있음’으로 바꿔 다시 골랐어요"
             },
         )
+        _state.update { it.copy(hintUndo = base) }
+    }
+
+    /** 힌트로 바꾼 조건을 이전으로 되돌린다. */
+    fun undoHint() {
+        val prev = _state.value.hintUndo ?: return
+        editConditions()
+        updateDraft(prev)
+        confirmConditions()
+        replannedJob?.cancel()
+        _state.update { it.copy(replanned = null, hintUndo = null) }
+    }
+
+    /** 대안 없음에서 ‘다시 보니 열려 있어요’. 마지막으로 막혔다고 한 입구(지금 계획의 입구)를 되돌린다. */
+    fun reopenEntrance() {
+        val id = _state.value.selected?.walk?.toEntranceId ?: return
+        dispatch(TripEvent.EntranceReopened(id))
+        afterReplanStarted()
     }
 
     /** SpeechToText로 받은 발화를 키워드 규칙으로 조건 초안에 반영한다. 실패하면 기존 조건을 건드리지 않는다. */
@@ -379,10 +399,10 @@ class TripViewModel(private val c: AppContainer) : ViewModel() {
 
     private fun showReplanned(text: String) {
         replannedJob?.cancel()
-        _state.update { it.copy(replanned = text) }
+        _state.update { it.copy(replanned = text, hintUndo = null) }
         replannedJob = viewModelScope.launch {
             delay(15_000)
-            _state.update { it.copy(replanned = null) }
+            _state.update { it.copy(replanned = null, hintUndo = null) }
         }
     }
 

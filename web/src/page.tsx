@@ -36,7 +36,7 @@ export const GuidePage: FC<{ trip: StoredTrip; events: PhoneEvent[] }> = ({ trip
     <details class="row">
       <summary>
         <span>주차 위치</span>
-        <b id="parking-note">{s.parkingNote ?? "지금 남기기"}</b>
+        <b id="parking-note" class={s.parkingNote ? "" : "empty"}>{s.parkingNote ?? "남기기"}</b>
       </summary>
       <form data-type="parking_note">
         <input name="note" maxlength={40} placeholder="예: 지하 2층 B-14" aria-label="주차 위치 메모" />
@@ -68,12 +68,12 @@ export const GuidePage: FC<{ trip: StoredTrip; events: PhoneEvent[] }> = ({ trip
           {s.demo && <span class="badge">시연 데이터</span>}
         </header>
         <main data-stage={stage}>
-          {s.noAlternative ? (
+          {s.noAlternative && stage !== "return" ? (
             <>
               <h1>확인된 다른 입구가 없어요</h1>
               <p class="sub">같은 조건으로 갈 수 있는 길을 찾지 못했어요. 없는 길을 만들어 안내하지 않아요.</p>
               {spotCard}
-              {s.contact && <p class="sub">시설 연락처 · {s.contact}{s.demo && " (시연용 번호)"}</p>}
+              {s.contact && <section class="spot"><p class="label">시설 연락처</p><p class="mid">{s.contact}{s.demo && " (시연용 번호)"}</p></section>}
             </>
           ) : stage === "visit" ? (
             <>
@@ -123,11 +123,12 @@ export const GuidePage: FC<{ trip: StoredTrip; events: PhoneEvent[] }> = ({ trip
           </details>
         </main>
         <nav class="bar">
-          {s.noAlternative && s.contact && <a class="primary" href={`tel:${s.contact}`}>시설에 전화</a>}
+          {s.noAlternative && stage !== "return" && s.contact && <a class="primary" href={`tel:${s.contact}`}>시설에 전화</a>}
+          {s.noAlternative && stage !== "return" && <button data-type="returning" class="quiet">차로 돌아가는 길 보기</button>}
           {!s.noAlternative && stage === "guide" && <button data-type="arrived" class="primary">입구에 도착했어요</button>}
           {!s.noAlternative && stage === "visit" && <button data-type="returning" class="primary">차로 돌아가기</button>}
           {stage === "visit" && <button data-type="arrival_undone" class="quiet">아직 도착하지 않았어요</button>}
-          {!s.noAlternative && stage === "return" && <p class="hint">차에 타면 차량 화면에서 ‘차에 탔어요’를 눌러 마무리해요</p>}
+          {stage === "return" && <p class="hint">차에 타면 차량 화면에서 ‘차에 탔어요’를 눌러 마무리해요</p>}
         </nav>
         <script dangerouslySetInnerHTML={{ __html: script(trip.token, trip.version) }} />
       </body>
@@ -212,7 +213,7 @@ h1 { font-size: 28px; line-height: 1.3; margin: 0 0 4px; } h2 { font-size: 15px;
 .label { margin: 0; color: var(--muted); font-size: 15px; } .big { font-size: 40px; font-weight: 700; margin: 4px 0 8px; line-height: 1.2; } .mid { font-size: 22px; font-weight: 700; margin: 2px 0 6px; }
 details.row { margin-top: 16px; background: var(--surface); border: 1px solid var(--line); }
 details.row summary { list-style: none; display:flex; justify-content: space-between; align-items:center; padding: 0 16px; min-height: 56px; cursor: pointer; }
-details.row summary b { color: var(--fg); } details.row summary b::after { content: "  바꾸기 ›"; color: var(--primary); font-weight: 500; }
+details.row summary b { color: var(--fg); } details.row summary b::after { content: "  · 고치기 ›"; color: var(--primary); font-weight: 500; } details.row summary b.empty { color: var(--primary); } details.row summary b.empty::after { content: " ›"; } details.row summary { min-height: 56px; }
 .changed { background: #E6EDF5; color: #002C5F; border-left: 4px solid #002C5F; padding: 12px 14px; margin: 0 0 12px; min-height: 48px; font-weight: 600; border-radius: 4px; }
 details.row form { display:flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 16px; }
 details.row input { flex: 1; min-width: 0; font-size: 17px; padding: 12px; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: var(--fg); }
