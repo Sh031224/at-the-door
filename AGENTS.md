@@ -74,13 +74,13 @@
 - Maven: `https://nexus-playground.pleos.ai/repository/maven-releases/`, 인증 없음
 - 버전: NaviHelper 3.0.5, Vehicle 2.3.2, SpeechToText 3.3.1, TextToSpeech 3.3.1, FusedLocation 1.1.3
 - 권한(`pleos.car.permission.*`): `NAVI_ROUTE_SEARCH`, `CAR_DRIVE`(Gear), `CAR_DOORS`, `CAR_SEATS`, `FUSED_LOCATION`, `STT_SERVICE`, `TTS_SERVICE`. 퍼미션은 Pleos App Market과 협의·승인된 범위에서만 쓴다. 제어 권한(`CONTROL_*`)은 쓰지 않는다.
-- NaviHelper: `onRouteStarted`는 경로 **탐색 시작**, `onRoutingCompleted`가 **안내 시작**이다. `requestRoute` 호출 성공은 아무것도 보장하지 않는다. 문서에 없는 `onRouteEnded()`가 있다. `RouteInfo`의 `poiId`, `address`, `poiSubId`, `poiProvider`는 non-null 문자열이다.
+- NaviHelper: 문서상 `onRouteStarted`는 탐색 시작, `onRoutingCompleted`는 탐색 완료다. 그러나 **에뮬레이터 실측(2026-11-11)**에서는 Navigation 앱이 경로 계산 후 안내를 시작할 때(요청 후 약 10~11초) `onRouteStarted(RouteStartInfo: 목적지 이름·거리·시간)` → `onRouteEnded` → `onNavigationStatus(ROUTE_DRIVE)`를 보냈고 `onRoutingCompleted`는 오지 않았다. 그래서 우리 목적지 이름과 거리가 담긴 `onRouteStarted`(또는 `onRoutingCompleted`)를 안내 시작으로 보고, 시작 직후 3초 안의 `onRouteEnded`는 무시한다. `requestRoute` 호출 성공은 아무것도 보장하지 않는다. `RouteInfo`의 `poiId`, `address`, `poiSubId`, `poiProvider`는 non-null 문자열이다.
 - Vehicle: `Gear` API가 있으나 deprecated이며 Google `GEAR_SELECTION` 속성을 권장한다. 주차 브레이크 조회 API는 없다(Brake는 페달 상태만).
 - STT·TTS: ON_DEVICE 모드는 앱 등록이 필요 없다. HYBRID·SERVER는 Pleos Playground My Project 자격 증명으로 `registerApp`이 필요하다. TTS `speak(text, isFinal)`.
 - 주행 제한: `CarUxRestrictionsManager`만 기준으로 삼는다. QR은 `UX_RESTRICTIONS_NO_SETUP`도 함께 확인해 주차 상태에서만 보여 준다.
-- 에뮬레이터: Pleos Connect Emulator v2.1.0, API 34 이미지, **Cold boot 필수**(quick boot에서는 VHAL 사용 불가).
+- 에뮬레이터: Pleos Connect Emulator v2.1.0, API 34 이미지(2560×1440, 앱 창 1682×1210, 밝은 테마), **Cold boot 필수**(quick boot에서는 VHAL 사용 불가). `-no-audio -dns-server 8.8.8.8`로 띄운다(오디오는 부팅 멈춤, DNS가 없으면 내비가 경로를 못 만듦). user 빌드라 `inject-vhal-event`는 막혀 있고, 차량 상태는 Virtual Console(`adb forward tcp:8088 tcp:8088`, 브라우저 세션 필요)로 바꾼다. DO 선언은 홈 화면이 `distractionOptimized: true`로 인식한다.
 
-아직 확인하지 못한 것: 에뮬레이터 Navigation 앱이 `requestRoute` 이벤트를 보내는지, 3rd party 앱의 DO 선언에 별도 승인이 필요한지, 심사용 GitHub 계정, 2차 PT 심사 기준.
+아직 확인하지 못한 것: 3rd party 앱의 DO 선언에 App Market 별도 승인이 필요한지, 에뮬레이터 마이크로 STT 인식, 심사용 GitHub 계정, 2차 PT 심사 기준.
 
 ## 제품 원칙
 
