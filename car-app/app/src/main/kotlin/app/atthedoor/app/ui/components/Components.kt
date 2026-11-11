@@ -5,33 +5,29 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -49,175 +45,264 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import app.atthedoor.app.ui.theme.LocalVerdictColors
-import app.atthedoor.app.ui.theme.TouchTarget
+import app.atthedoor.app.ui.theme.Atd
+import app.atthedoor.app.ui.theme.Touch
+import app.atthedoor.app.ui.theme.Type
 import app.atthedoor.domain.plan.VerdictKind
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
 
-@Composable
-fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, icon: ImageVector? = null) {
-    Button(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier.heightIn(min = TouchTarget),
-        shape = RoundedCornerShape(18.dp),
-        contentPadding = PaddingValues(horizontal = 32.dp, vertical = 14.dp),
-    ) { ButtonContent(text, icon) }
-}
+private val Corner = RoundedCornerShape(4.dp)
 
-@Composable
-fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, icon: ImageVector? = null) {
-    OutlinedButton(
-        onClick = onClick,
-        enabled = enabled,
-        modifier = modifier.heightIn(min = TouchTarget),
-        shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
-        contentPadding = PaddingValues(horizontal = 28.dp, vertical = 14.dp),
-    ) { ButtonContent(text, icon) }
-}
+// ── 버튼 ─────────────────────────────────────────────
 
-@Composable
-fun DangerButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, icon: ImageVector? = null) {
-    Button(
-        onClick = onClick,
-        modifier = modifier.heightIn(min = TouchTarget),
-        shape = RoundedCornerShape(18.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer),
-        contentPadding = PaddingValues(horizontal = 28.dp, vertical = 14.dp),
-    ) { ButtonContent(text, icon) }
-}
+enum class ButtonKind { PRIMARY, SECONDARY, REPORT, QUIET }
 
+/**
+ * 모든 버튼. 주 버튼은 딥 네이비 채움, 보조는 흰 바탕 + 1.5dp 선, 제보(만차·막힘)는 경고 채움,
+ * 조용한 버튼은 선 없는 글자 버튼이다. 모서리는 4dp.
+ */
 @Composable
-private fun RowScope.ButtonContent(text: String, icon: ImageVector?) {
-    if (icon != null) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(30.dp))
-        Spacer(Modifier.width(12.dp))
+fun AtdButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    kind: ButtonKind = ButtonKind.PRIMARY,
+    icon: ImageVector? = null,
+    enabled: Boolean = true,
+    height: Dp = Touch.button,
+    textStyle: TextStyle = Type.label,
+    trailing: ImageVector? = null,
+) {
+    val c = Atd.colors
+    val bg = when (kind) {
+        ButtonKind.PRIMARY -> if (enabled) c.primary else c.inkFaint
+        ButtonKind.SECONDARY -> c.surface
+        ButtonKind.REPORT -> c.cautionFill
+        ButtonKind.QUIET -> Color.Transparent
     }
-    Text(text, style = MaterialTheme.typography.labelLarge)
-}
-
-/** 큰 토글 칩. 차량 화면에서는 작은 체크박스 대신 넓은 선택 영역을 쓴다. */
-@Composable
-fun ToggleTile(label: String, selected: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier, description: String? = null, compact: Boolean = false) {
-    val cs = MaterialTheme.colorScheme
-    Surface(
-        onClick = onToggle,
-        modifier = modifier
-            .heightIn(min = TouchTarget)
-            .semantics { this.selected = selected; role = Role.Checkbox },
-        shape = RoundedCornerShape(18.dp),
-        color = if (selected) cs.primaryContainer else cs.surface,
-        border = BorderStroke(if (selected) 3.dp else 2.dp, if (selected) cs.primary else cs.outline),
+    val fg = when (kind) {
+        ButtonKind.PRIMARY -> c.onPrimary
+        ButtonKind.SECONDARY -> if (enabled) c.ink else c.inkFaint
+        ButtonKind.REPORT -> c.onCautionFill
+        ButtonKind.QUIET -> c.route
+    }
+    val border: BorderStroke? = if (kind == ButtonKind.SECONDARY) BorderStroke(1.5.dp, c.line) else null
+    Row(
+        modifier
+            .heightIn(min = height)
+            .clip(Corner)
+            .background(bg)
+            .let { if (border != null) it.border(border, Corner) else it }
+            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .padding(horizontal = 28.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
     ) {
-        if (compact) {
-            Box(Modifier.padding(horizontal = 22.dp, vertical = 14.dp), contentAlignment = Alignment.Center) {
-                Text(label, style = MaterialTheme.typography.titleMedium, color = if (selected) cs.onPrimaryContainer else cs.onSurface, maxLines = 1, softWrap = false)
-            }
-            return@Surface
+        if (icon != null) {
+            Icon(icon, null, tint = fg, modifier = Modifier.size(32.dp))
+            Spacer(Modifier.width(14.dp))
         }
-        Row(Modifier.padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(34.dp).clip(CircleShape).background(if (selected) cs.primary else cs.surfaceVariant),
-                contentAlignment = Alignment.Center,
-            ) { if (selected) Icon(Icons.Filled.Check, null, tint = cs.onPrimary, modifier = Modifier.size(24.dp)) }
-            Spacer(Modifier.width(16.dp))
-            Column {
-                Text(label, style = MaterialTheme.typography.titleMedium, color = if (selected) cs.onPrimaryContainer else cs.onSurface)
-                if (description != null) Text(description, style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
-            }
+        Text(text, style = textStyle, color = fg, maxLines = 2, textAlign = TextAlign.Center)
+        if (trailing != null) {
+            Spacer(Modifier.width(12.dp))
+            Icon(trailing, null, tint = fg, modifier = Modifier.size(30.dp))
         }
     }
 }
 
+// ── 선택 ─────────────────────────────────────────────
+
+/** 큰 선택 타일. 선택되면 네이비 3dp 테두리와 오른쪽 위 체크. 질문 하나의 답을 고를 때 쓴다. */
+@Composable
+fun ChoiceTile(
+    title: String,
+    subtitle: String?,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+) {
+    val c = Atd.colors
+    Column(
+        modifier
+            .clip(Corner)
+            .background(if (selected) c.surfaceAlt else c.surface)
+            .border(if (selected) 3.dp else 1.5.dp, if (selected) c.primary else c.line, Corner)
+            .clickable(onClick = onClick)
+            .semantics { this.selected = selected; role = Role.RadioButton }
+            .padding(28.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (icon != null) Icon(icon, null, tint = if (selected) c.primary else c.inkMuted, modifier = Modifier.size(56.dp))
+            Spacer(Modifier.weight(1f))
+            Box(
+                Modifier.size(40.dp).clip(CircleShape).background(if (selected) c.primary else c.surface).border(2.dp, if (selected) c.primary else c.line, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) { if (selected) Icon(Glyph.Check, null, tint = c.onPrimary, modifier = Modifier.size(28.dp)) }
+        }
+        Text(title, style = Type.title, color = c.ink)
+        if (subtitle != null) Text(subtitle, style = Type.body, color = c.inkMuted)
+    }
+}
+
+/** 칩. 높이 76dp, 4dp 모서리, 선택 시 네이비 테두리와 굵은 글자. onClick이 없으면 표시용이다. */
+@Composable
+fun AtdChip(text: String, selected: Boolean, onClick: (() -> Unit)?, modifier: Modifier = Modifier) {
+    val c = Atd.colors
+    Box(
+        modifier
+            .heightIn(min = Touch.min)
+            .clip(Corner)
+            .background(if (selected) c.surfaceAlt else c.surface)
+            .border(if (selected) 2.dp else 1.5.dp, if (selected) c.primary else c.line, Corner)
+            .let { m -> if (onClick != null) m.clickable(onClick = onClick).semantics { this.selected = selected } else m }
+            .padding(horizontal = 24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, style = if (selected) Type.bodyStrong else Type.body, color = if (selected) c.primary else c.ink, maxLines = 1)
+    }
+}
+
+// ── 표시 ─────────────────────────────────────────────
+
+/** 판정 배지. 색과 함께 글자를 늘 붙인다. */
 @Composable
 fun VerdictBadge(kind: VerdictKind) {
-    val v = LocalVerdictColors.current
-    val (label, color) = when (kind) {
-        VerdictKind.RECOMMENDED -> "추천" to v.recommended
-        VerdictKind.ELIGIBLE -> "가능" to v.eligible
-        VerdictKind.NEEDS_CHECK -> "확인 필요" to v.needsCheck
-        VerdictKind.EXCLUDED -> "추천하지 않음" to v.excluded
+    val c = Atd.colors
+    val label = when (kind) {
+        VerdictKind.RECOMMENDED -> "추천"
+        VerdictKind.ELIGIBLE -> "가능"
+        VerdictKind.NEEDS_CHECK -> "확인 필요"
+        VerdictKind.EXCLUDED -> "추천하지 않음"
     }
+    val bg = when (kind) {
+        VerdictKind.RECOMMENDED -> c.recommended
+        VerdictKind.NEEDS_CHECK -> c.cautionBg
+        else -> c.surfaceAlt
+    }
+    val fg = when (kind) {
+        VerdictKind.RECOMMENDED -> c.onPrimary
+        VerdictKind.NEEDS_CHECK -> c.caution
+        VerdictKind.ELIGIBLE -> c.ink
+        VerdictKind.EXCLUDED -> c.inkMuted
+    }
+    Text(label, Modifier.clip(RoundedCornerShape(2.dp)).background(bg).padding(horizontal = 14.dp, vertical = 4.dp), color = fg, style = Type.caption.copy(fontWeight = FontWeight.Bold))
+}
+
+@Composable
+fun DemoBadge(modifier: Modifier = Modifier, large: Boolean = false) {
+    val c = Atd.colors
     Text(
-        label,
-        Modifier.clip(RoundedCornerShape(10.dp)).background(color).padding(horizontal = 14.dp, vertical = 6.dp),
-        color = v.onBadge,
-        style = MaterialTheme.typography.labelMedium,
+        "시연 데이터",
+        modifier.clip(RoundedCornerShape(2.dp)).background(c.demoBg).padding(horizontal = 14.dp, vertical = 6.dp),
+        color = c.demo,
+        style = if (large) Type.bodyStrong else Type.caption.copy(fontWeight = FontWeight.SemiBold),
     )
 }
 
-enum class NoticeTone { INFO, WARN, ERROR, SUCCESS }
+enum class Tone { INFO, CAUTION, ERROR, SUCCESS }
 
+/** 화면 위 알림 띠. 본문을 아래로 밀어 겹치지 않는다. */
 @Composable
-fun NoticeBanner(text: String, modifier: Modifier = Modifier, tone: NoticeTone = NoticeTone.INFO, action: (@Composable () -> Unit)? = null) {
-    val cs = MaterialTheme.colorScheme
-    val (bg, fg) = when (tone) {
-        NoticeTone.INFO -> cs.primaryContainer to cs.onPrimaryContainer
-        NoticeTone.WARN -> cs.tertiaryContainer to cs.onTertiaryContainer
-        NoticeTone.ERROR -> cs.errorContainer to cs.onErrorContainer
-        NoticeTone.SUCCESS -> cs.secondaryContainer to cs.onSecondaryContainer
-    }
+fun NoticeStrip(text: String, tone: Tone, modifier: Modifier = Modifier, large: Boolean = false, action: (@Composable () -> Unit)? = null) {
+    val c = Atd.colors
+    val bg = when (tone) { Tone.INFO -> c.infoBg; Tone.CAUTION -> c.cautionBg; Tone.ERROR -> c.dangerBg; Tone.SUCCESS -> c.successBg }
+    val fg = when (tone) { Tone.INFO -> c.info; Tone.CAUTION -> c.caution; Tone.ERROR -> c.danger; Tone.SUCCESS -> c.success }
+    val icon = when (tone) { Tone.SUCCESS -> Glyph.Check; Tone.INFO -> Glyph.Info; else -> Glyph.Warning }
     Row(
-        modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(bg).padding(horizontal = 24.dp, vertical = 18.dp),
+        modifier.fillMaxWidth().heightIn(min = if (large) 120.dp else 72.dp).background(bg).padding(horizontal = 48.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(if (tone == NoticeTone.INFO || tone == NoticeTone.SUCCESS) Icons.Filled.Info else Icons.Filled.Warning, null, tint = fg, modifier = Modifier.size(32.dp))
-        Spacer(Modifier.width(16.dp))
-        Text(text, Modifier.weight(1f), color = fg, style = MaterialTheme.typography.bodyLarge)
-        if (action != null) {
-            Spacer(Modifier.width(16.dp))
-            action()
-        }
+        Icon(icon, null, tint = fg, modifier = Modifier.size(if (large) 44.dp else 32.dp))
+        Spacer(Modifier.width(18.dp))
+        Text(text, Modifier.weight(1f), style = if (large) Type.title else Type.bodyStrong, color = c.ink)
+        if (action != null) action()
+    }
+}
+
+/** 흰 평면 구역. 카드 안에 카드를 넣지 않고 1px 선으로만 나눈다. */
+@Composable
+fun Panel(modifier: Modifier = Modifier, padding: Dp = 32.dp, spacing: Dp = 20.dp, content: @Composable ColumnScope.() -> Unit) {
+    val c = Atd.colors
+    Column(modifier.background(c.surface).border(1.dp, c.line).padding(padding), verticalArrangement = Arrangement.spacedBy(spacing), content = content)
+}
+
+@Composable
+fun Hairline(modifier: Modifier = Modifier) {
+    Box(modifier.fillMaxWidth().height(1.dp).background(Atd.colors.line))
+}
+
+@Composable
+fun Headline(text: String, modifier: Modifier = Modifier, sub: String? = null) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(text, style = Type.display, color = Atd.colors.ink)
+        if (sub != null) Text(sub, style = Type.body, color = Atd.colors.inkMuted)
     }
 }
 
 @Composable
-fun SectionCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-    ) { Column(Modifier.padding(28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) { content() } }
+fun LabelValue(label: String, value: String, modifier: Modifier = Modifier, valueStyle: TextStyle = Type.title) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(label, style = Type.caption, color = Atd.colors.inkMuted)
+        Text(value, style = valueStyle, color = Atd.colors.ink)
+    }
 }
 
+/** 번호가 붙은 이동 순서 */
 @Composable
-fun StepList(steps: List<String>, modifier: Modifier = Modifier) {
-    val cs = MaterialTheme.colorScheme
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        if (steps.isEmpty()) Text("확인된 이동 순서가 없어요", color = cs.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge)
+fun StepList(steps: List<String>, modifier: Modifier = Modifier, style: TextStyle = Type.body) {
+    val c = Atd.colors
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        if (steps.isEmpty()) Text("확인된 이동 순서가 없어요", style = Type.body, color = c.inkMuted)
         steps.forEachIndexed { i, s ->
             Row(verticalAlignment = Alignment.Top) {
-                Box(Modifier.size(42.dp).clip(CircleShape).background(cs.primary), contentAlignment = Alignment.Center) {
-                    Text("${i + 1}", color = cs.onPrimary, style = MaterialTheme.typography.titleMedium)
+                Box(Modifier.size(44.dp).clip(CircleShape).border(2.dp, c.primary, CircleShape), contentAlignment = Alignment.Center) {
+                    Text("${i + 1}", style = Type.bodyStrong, color = c.primary)
                 }
-                Spacer(Modifier.width(18.dp))
-                Text(s, Modifier.padding(top = 4.dp), style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Normal))
+                Spacer(Modifier.width(20.dp))
+                Text(s, Modifier.padding(top = 2.dp), style = style, color = c.ink)
             }
         }
     }
 }
 
-/** assets/photos 아래 입구 이미지. 시연용 일러스트는 이미지 자체에 ‘실제 사진 아님’ 표시가 들어 있다. */
+enum class ReasonKind { OK, CHECK, BLOCK }
+
+/** 판정 이유 한 줄. 아이콘과 색으로 종류를 구분한다. */
+@Composable
+fun ReasonLine(text: String, kind: ReasonKind, modifier: Modifier = Modifier) {
+    val c = Atd.colors
+    val icon = when (kind) { ReasonKind.OK -> Glyph.Check; ReasonKind.CHECK -> Glyph.Question; ReasonKind.BLOCK -> Glyph.Block }
+    val tint = when (kind) { ReasonKind.OK -> c.success; ReasonKind.CHECK -> c.caution; ReasonKind.BLOCK -> c.inkMuted }
+    Row(modifier, verticalAlignment = Alignment.Top) {
+        Icon(icon, null, tint = tint, modifier = Modifier.padding(top = 2.dp).size(32.dp))
+        Spacer(Modifier.width(14.dp))
+        Text(text, style = Type.body, color = c.ink)
+    }
+}
+
+// ── 이미지 ───────────────────────────────────────────
+
+/** assets/photos 아래 입구 이미지. 시연용 일러스트는 이미지 안에 ‘실제 사진 아님’ 표시가 들어 있다. */
 @Composable
 fun EntranceImage(path: String?, contentDescription: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val bitmap: ImageBitmap? = remember(path) {
         path?.let { p -> runCatching { context.assets.open("photos/$p").use { BitmapFactory.decodeStream(it)?.asImageBitmap() } }.getOrNull() }
     }
-    val cs = MaterialTheme.colorScheme
-    Box(modifier.aspectRatio(1.5f).clip(RoundedCornerShape(20.dp)).background(cs.surfaceVariant), contentAlignment = Alignment.Center) {
-        if (bitmap != null) {
-            Image(bitmap, contentDescription, Modifier.matchParentSize(), contentScale = ContentScale.Crop)
-        } else {
-            Text("등록된 입구 사진이 없어요", color = cs.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
-        }
+    val c = Atd.colors
+    Box(modifier.clip(Corner).background(c.surfaceAlt).border(1.dp, c.line, Corner), contentAlignment = Alignment.Center) {
+        if (bitmap != null) Image(bitmap, contentDescription, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        else Text("등록된 입구 사진이 없어요", style = Type.body, color = c.inkMuted, textAlign = TextAlign.Center)
     }
 }
 
@@ -227,12 +312,7 @@ fun QrCode(text: String, modifier: Modifier = Modifier) {
     Image(
         bitmap,
         contentDescription = null,
-        modifier = modifier
-            .semantics { contentDescription = "휴대폰 안내 QR 코드" }
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color.White)
-            .border(2.dp, Color(0xFFDDDDDD), RoundedCornerShape(16.dp))
-            .padding(12.dp),
+        modifier = modifier.semantics { contentDescription = "휴대폰 안내 QR 코드" }.background(Color.White).border(1.dp, Atd.colors.line).padding(16.dp),
     )
 }
 
@@ -242,20 +322,66 @@ private fun qrBitmap(text: String, size: Int = 600): ImageBitmap {
     return android.graphics.Bitmap.createBitmap(pixels, size, size, android.graphics.Bitmap.Config.ARGB_8888).asImageBitmap()
 }
 
+// ── 시트 ─────────────────────────────────────────────
+
+/**
+ * 오른쪽에서 여는 시트. 근거, 다른 계획, 조건, 주차 메모처럼 매번 볼 필요가 없는 정보를 둔다.
+ * 바깥 어두운 막을 누르면 닫힌다.
+ */
 @Composable
-fun LabelValue(label: String, value: String, modifier: Modifier = Modifier) {
-    Column(modifier) {
-        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.titleMedium)
+fun BoxScope.SideSheet(title: String, onClose: () -> Unit, width: Dp = 760.dp, footer: (@Composable () -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
+    val c = Atd.colors
+    Box(
+        Modifier.matchParentSize().background(Color(0x66000000))
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClose),
+    )
+    Column(
+        Modifier.align(Alignment.CenterEnd).fillMaxHeight().width(width).background(c.surface)
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
+    ) {
+        Row(Modifier.fillMaxWidth().height(96.dp).padding(start = 40.dp, end = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, Modifier.weight(1f), style = Type.title, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Box(Modifier.size(Touch.min).clickable(onClick = onClose).semantics { contentDescription = "닫기" }, contentAlignment = Alignment.Center) {
+                Icon(Glyph.Close, null, tint = c.ink, modifier = Modifier.size(36.dp))
+            }
+        }
+        Hairline()
+        Column(
+            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 40.dp, vertical = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+            content = content,
+        )
+        if (footer != null) {
+            Hairline()
+            Box(Modifier.fillMaxWidth().padding(horizontal = 40.dp, vertical = 20.dp)) { footer() }
+        }
     }
 }
 
+/** 시트·목록의 한 줄 행. onClick이 있으면 오른쪽에 화살표를 붙인다. */
 @Composable
-fun Pill(text: String, modifier: Modifier = Modifier, container: Color = MaterialTheme.colorScheme.surfaceVariant, content: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
-    Text(
-        text,
-        modifier.clip(RoundedCornerShape(999.dp)).background(container).padding(horizontal = 16.dp, vertical = 6.dp),
-        color = content,
-        style = MaterialTheme.typography.labelMedium,
-    )
+fun ListRow(
+    title: String,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    leading: (@Composable () -> Unit)? = null,
+    trailing: (@Composable RowScope.() -> Unit)? = null,
+    onClick: (() -> Unit)? = null,
+) {
+    val c = Atd.colors
+    Row(
+        modifier.fillMaxWidth().heightIn(min = 96.dp).let { if (onClick != null) it.clickable(onClick = onClick) else it }.padding(vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (leading != null) {
+            leading()
+            Spacer(Modifier.width(20.dp))
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(title, style = Type.bodyStrong, color = c.ink)
+            if (subtitle != null) Text(subtitle, style = Type.body, color = c.inkMuted)
+        }
+        if (trailing != null) trailing()
+        else if (onClick != null) Icon(Glyph.Chevron, null, tint = c.inkMuted, modifier = Modifier.size(36.dp))
+    }
 }

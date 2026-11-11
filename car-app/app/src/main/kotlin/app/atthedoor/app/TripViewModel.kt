@@ -80,6 +80,8 @@ data class TripUiState(
     val voice: VoiceState = VoiceState(),
     /** 주행 중 재계획으로 계획이 바뀌었을 때 잠시 보여 줄 문구. 음성과 함께 화면에서도 바뀐 것을 알 수 있게 한다. */
     val replanned: String? = null,
+    /** 완료 화면에서 고르는 중인 제보. 하단 버튼 문구가 이 값을 따른다. */
+    val feedbackDraft: Set<FeedbackKind> = emptySet(),
 ) {
     val selected: Candidate? get() = trip?.selectedCandidateId?.let { venue?.candidate(it) }
     val selectedEntrance: Entrance? get() = selected?.let { venue?.entrance(it.walk.toEntranceId) }
@@ -404,6 +406,10 @@ class TripViewModel(private val c: AppContainer) : ViewModel() {
 
     fun giveFeedback(kinds: Set<FeedbackKind>) = dispatch(TripEvent.FeedbackGiven(kinds))
 
+    fun toggleFeedback(kind: FeedbackKind) = _state.update { s ->
+        s.copy(feedbackDraft = if (kind in s.feedbackDraft) s.feedbackDraft - kind else s.feedbackDraft + kind)
+    }
+
     fun cancel() {
         dispatch(TripEvent.Cancel)
         naviJob?.cancel()
@@ -416,7 +422,7 @@ class TripViewModel(private val c: AppContainer) : ViewModel() {
         naviJob?.cancel()
         finishShare()
         val trip = Trip.start(newId(), venue.id)
-        _state.update { it.copy(trip = trip, navi = NaviStatus.IDLE, share = ShareState.None, voice = VoiceState(), arrival = Arrival.NOW) }
+        _state.update { it.copy(trip = trip, navi = NaviStatus.IDLE, share = ShareState.None, voice = VoiceState(), arrival = Arrival.NOW, feedbackDraft = emptySet(), replanned = null) }
         viewModelScope.launch { c.tripStore.save(trip) }
         reevaluate()
     }
