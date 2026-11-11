@@ -40,6 +40,7 @@ import app.atthedoor.app.ui.components.SideSheet
 import app.atthedoor.app.ui.components.VerdictBadge
 import app.atthedoor.app.ui.theme.Atd
 import app.atthedoor.app.ui.theme.Type
+import app.atthedoor.domain.model.Labels
 import app.atthedoor.domain.model.MobilityAid
 import app.atthedoor.domain.model.TravelConditions
 import app.atthedoor.domain.model.VerificationStatus
@@ -65,7 +66,7 @@ fun BoxScope.Sheets(sheet: Sheet, state: TripUiState, vm: TripViewModel, onClose
         }
         Sheet.CONDITIONS -> SideSheet("이동 조건", onClose, footer = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                PreviewLine(state)
+                SheetPreview(state)
                 AtdButton("적용", onClose, Modifier.fillMaxWidth())
             }
         }) {
@@ -126,8 +127,8 @@ fun BoxScope.Sheets(sheet: Sheet, state: TripUiState, vm: TripViewModel, onClose
                 r.verdict.cautions.forEach { ReasonLine("현장 확인 · $it", ReasonKind.CHECK) }
                 Hairline()
                 val e = r.evidence
-                LabelValue("근거", e?.let { "${it.label} (${statusLabel(it.status)})" } ?: "확인된 정보 없음", valueStyle = Type.body)
-                EntranceImage(entrance?.photos?.firstOrNull(), "${entrance?.name ?: "입구"} 모습", Modifier.fillMaxWidth().aspectRatio(1.5f))
+                LabelValue("근거", e?.let { if (it.status == VerificationStatus.DEMO) "${it.source}, ${it.checkedAt}" else "${it.label} (${statusLabel(it.status)})" } ?: "확인된 정보 없음", valueStyle = Type.body)
+                EntranceImage(entrance?.photos?.firstOrNull(), illustration = entrance?.photoKind == app.atthedoor.domain.model.PhotoKind.ILLUSTRATION, contentDescription = "${entrance?.name ?: "입구"} 모습", modifier = Modifier.fillMaxWidth().aspectRatio(1.5f))
             }
         }
         Sheet.PARKING_NOTE -> SideSheet("주차 위치 남기기", onClose, footer = { AtdButton("완료", onClose, Modifier.fillMaxWidth()) }) {
@@ -151,7 +152,16 @@ fun BoxScope.Sheets(sheet: Sheet, state: TripUiState, vm: TripViewModel, onClose
             ListRow("새로 계획하기", leading = { Icon(Glyph.Edit, null, Modifier.size(40.dp)) }, onClick = { vm.startOver(); onClose() })
             Hairline()
             if (phase?.finished == false) {
-                ListRow("외출 그만두기", subtitle = "휴대폰 링크도 바로 지워요", leading = { Icon(Glyph.Close, null, Modifier.size(40.dp), tint = Atd.colors.danger) }, onClick = { vm.cancel(); onClose() })
+                var confirm by remember { mutableStateOf(false) }
+                if (!confirm) {
+                    ListRow("외출 그만두기", subtitle = "휴대폰 링크도 바로 지워요", leading = { Icon(Glyph.Close, null, Modifier.size(40.dp), tint = Atd.colors.danger) }, trailing = {}, onClick = { confirm = true })
+                } else {
+                    Text("외출 안내를 그만둘까요? 휴대폰 링크도 지워져요.", style = Type.bodyStrong, color = Atd.colors.ink)
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        AtdButton("그만두기", { vm.cancel(); onClose() }, kind = ButtonKind.REPORT)
+                        AtdButton("계속하기", { confirm = false }, kind = ButtonKind.SECONDARY)
+                    }
+                }
                 Hairline()
             }
         }
@@ -171,10 +181,10 @@ private fun statusLabel(s: VerificationStatus) = when (s) {
 
 
 @Composable
-private fun PreviewLine(state: TripUiState) {
+private fun SheetPreview(state: TripUiState) {
     val rec = state.evaluation?.recommended
     Text(
-        rec?.let { "이 조건이면 · 추천 ${it.candidate.name} (${walkLabel(it.candidate)})" } ?: "이 조건이면 · 확인된 계획이 아직 없어요",
+        rec?.let { "이 조건이면 · 추천 ${it.candidate.name} (${walkPrefix(it.candidate)} ${walkLabel(it.candidate)})" } ?: "이 조건이면 · 확인된 계획이 아직 없어요",
         style = Type.bodyStrong,
         color = if (rec != null) Atd.colors.ink else Atd.colors.caution,
     )
@@ -185,9 +195,9 @@ private fun CompanionChoice(c: TravelConditions, onChange: (TravelConditions) ->
     Text("입구까지 누가 함께 가나요?", style = Type.title, color = Atd.colors.ink)
     @OptIn(ExperimentalLayoutApi::class)
     FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        AtdChip("제가 같이 내려요", c.companionRequired && !c.otherGuardian, { onChange(c.copy(companionRequired = true, otherGuardian = false)) })
-        AtdChip("다른 보호자도 있어요", c.companionRequired && c.otherGuardian, { onChange(c.copy(companionRequired = true, otherGuardian = true)) })
-        AtdChip("함께 가지 않아도 돼요", !c.companionRequired, { onChange(c.copy(companionRequired = false, otherGuardian = false)) })
+        AtdChip(Labels.DRIVER_WITH, c.companionRequired && !c.otherGuardian, { onChange(c.copy(companionRequired = true, otherGuardian = false)) })
+        AtdChip(Labels.OTHER_GUARDIAN, c.companionRequired && c.otherGuardian, { onChange(c.copy(companionRequired = true, otherGuardian = true)) })
+        AtdChip(Labels.ALONE_OK, !c.companionRequired, { onChange(c.copy(companionRequired = false, otherGuardian = false)) })
     }
 }
 
@@ -197,15 +207,18 @@ private fun CompanionChoice(c: TravelConditions, onChange: (TravelConditions) ->
 fun ConditionsEditor(c: TravelConditions, onChange: (TravelConditions) -> Unit) {
     val col = Atd.colors
     Text("걷는 길", style = Type.title, color = col.ink)
+    Text("‘계단 없이’는 꼭 지키고, ‘짧게 걷기’는 가능하면 맞춰요.", style = Type.caption, color = col.inkMuted)
     FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        AtdChip("계단 없는 길 (꼭)", c.stepFreeRequired, { onChange(c.copy(stepFreeRequired = !c.stepFreeRequired)) })
-        AtdChip("짧게 걷기 (가능하면)", c.preferShortWalk, { onChange(c.copy(preferShortWalk = !c.preferShortWalk)) })
+        AtdChip(Labels.STEP_FREE, c.stepFreeRequired, { onChange(c.copy(stepFreeRequired = !c.stepFreeRequired)) })
+        AtdChip(Labels.SHORT_WALK, c.preferShortWalk, { onChange(c.copy(preferShortWalk = !c.preferShortWalk)) })
     }
     Text("보조기구", style = Type.title, color = col.ink)
     FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         MobilityAid.entries.forEach { aid -> AtdChip(aid.label, c.mobilityAid == aid, { onChange(c.copy(mobilityAid = aid)) }) }
     }
-    AtdChip("장애인 전용 주차 자격 확인함", c.hasDisabledParkingPermit, { onChange(c.copy(hasDisabledParkingPermit = !c.hasDisabledParkingPermit)) })
+    Text("주차", style = Type.title, color = col.ink)
+    AtdChip(Labels.PERMIT, c.hasDisabledParkingPermit, { onChange(c.copy(hasDisabledParkingPermit = !c.hasDisabledParkingPermit)) })
+    Text("표지가 없으면 장애인 전용 구역은 후보에서 빼요.", style = Type.caption, color = col.inkMuted)
     Text("고른 것만 반영해요. 보조기구와 자격 정보는 이 차에만 있어요.", style = Type.caption, color = col.inkMuted)
 }
 
@@ -217,9 +230,13 @@ private fun ParkingNotePicker(note: String?, knownFloors: List<String>, onSave: 
     var picked by remember { mutableStateOf<String?>(null) }
     val floor = note?.split(" ")?.firstOrNull()?.takeIf { it in floors } ?: picked ?: floors.singleOrNull()
     Text(note ?: "아직 남기지 않았어요", style = Type.headline, color = Atd.colors.ink)
-    Text("층", style = Type.title, color = Atd.colors.ink)
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        floors.forEach { f -> AtdChip(f, floor == f, { picked = f; onSave(f) }) }
+    if (floors.size == 1) {
+        Text("층 · ${floors.first()}", style = Type.title, color = Atd.colors.ink)
+    } else {
+        Text("층", style = Type.title, color = Atd.colors.ink)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            floors.forEach { f -> AtdChip(f, floor == f, { picked = f; onSave(f) }) }
+        }
     }
     if (floor != null) {
         Text("구역", style = Type.title, color = Atd.colors.ink)

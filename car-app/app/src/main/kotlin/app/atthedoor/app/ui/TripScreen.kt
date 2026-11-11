@@ -29,6 +29,7 @@ import app.atthedoor.app.ui.components.Tone
 import app.atthedoor.app.ui.components.TopBar
 import app.atthedoor.app.ui.screens.DrivingScreen
 import app.atthedoor.app.ui.screens.PhaseBody
+import app.atthedoor.app.ui.screens.PhaseCallbacks
 import app.atthedoor.app.ui.screens.Sheet
 import app.atthedoor.app.ui.screens.Sheets
 import app.atthedoor.app.ui.screens.phaseActions
@@ -51,6 +52,22 @@ fun TripScreen(vm: TripViewModel, onSwitchMode: () -> Unit) {
     val cue by vm.handoffCue.collectAsStateWithLifecycle()
     var sheet by rememberSaveable { mutableStateOf<Sheet?>(null) }
     val c = Atd.colors
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val askMic = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+    ) { granted -> if (granted) vm.startListening() else vm.micDenied() }
+    val callbacks = PhaseCallbacks(
+        speak = {
+            // 마이크 권한은 ‘말로 정하기’를 처음 누를 때 묻는다. 거절해도 버튼으로 끝까지 진행한다.
+            val granted = vm.isFake || androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (granted) vm.startListening() else askMic.launch(android.Manifest.permission.RECORD_AUDIO)
+        },
+        dial = { number ->
+            // 전화 앱(차량에서는 블루투스 연결 휴대폰)을 번호가 입력된 상태로 연다. 앱이 직접 걸지 않는다.
+            runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:$number")).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+        },
+    )
 
     // 단계가 바뀌면 열린 시트를 닫는다. 주행이 시작되면 시트도 함께 숨긴다.
     LaunchedEffect(state.trip?.phase, restricted) { if (restricted) sheet = null }
@@ -65,7 +82,7 @@ fun TripScreen(vm: TripViewModel, onSwitchMode: () -> Unit) {
                 } else {
                     TopBar(
                         venueName = state.venue?.name,
-                        stage = stageOf(state.trip?.phase),
+                        stage = stageOf(state),
                         demo = state.venue?.demo == true,
                         onMore = { sheet = Sheet.MORE },
                         onLogoLongPress = { sheet = Sheet.DEMO },
@@ -76,7 +93,7 @@ fun TripScreen(vm: TripViewModel, onSwitchMode: () -> Unit) {
                     Box(Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll).padding(horizontal = Grid.margin, vertical = 36.dp)) {
                         if (!state.loading) PhaseBody(state, vm, setupBlocked, cue) { sheet = it }
                     }
-                    if (!state.loading) phaseActions(state, vm) { sheet = it }?.let { (primary, rest) -> ActionBar(primary, *rest.toTypedArray()) }
+                    if (!state.loading) phaseActions(state, vm, callbacks) { sheet = it }?.let { (primary, rest) -> ActionBar(primary, *rest.toTypedArray()) }
                 }
             }
             if (!restricted) sheet?.let { s -> Sheets(s, state, vm, onClose = { sheet = null }, open = { sheet = it }, onSwitchMode = onSwitchMode) }
@@ -91,8 +108,10 @@ private fun Notices(state: TripUiState) {
     state.replanned?.let { NoticeStrip(it, Tone.SUCCESS) }
 }
 
-private fun stageOf(phase: TripPhase?): Stage = when (phase) {
-    null, TripPhase.PLANNING, TripPhase.CHOOSING, TripPhase.NAVI_REQUESTED, TripPhase.NEEDS_CHECK -> Stage.PREPARE
+private fun stageOf(state: TripUiState): Stage = when (state.trip?.phase) {
+    // 주차한 뒤 대안을 못 찾았으면 사람은 여전히 입구 근처에 있다. 단계 표시를 ‘준비’로 되돌리지 않는다.
+    TripPhase.NEEDS_CHECK -> if (state.trip.parkedAt != null || state.trip.parkingNote != null) Stage.WALK else Stage.PREPARE
+    null, TripPhase.PLANNING, TripPhase.CHOOSING, TripPhase.NAVI_REQUESTED -> Stage.PREPARE
     TripPhase.APPROACHING -> Stage.DRIVE
     TripPhase.PARKED, TripPhase.WALKING, TripPhase.VISITING, TripPhase.REPLANNING -> Stage.WALK
     TripPhase.RETURNING, TripPhase.COMPLETED, TripPhase.CANCELLED -> Stage.BACK

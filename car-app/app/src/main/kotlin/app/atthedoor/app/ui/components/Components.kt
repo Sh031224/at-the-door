@@ -292,17 +292,25 @@ fun ReasonLine(text: String, kind: ReasonKind, modifier: Modifier = Modifier) {
 
 // ── 이미지 ───────────────────────────────────────────
 
-/** assets/photos 아래 입구 이미지. 시연용 일러스트는 이미지 안에 ‘실제 사진 아님’ 표시가 들어 있다. */
+/** assets/photos 아래 입구 이미지. 시연용 일러스트면 왼쪽 위에 ‘시연 일러스트 · 실제 사진 아님’을 덧씌운다(잘려도 사라지지 않게). */
 @Composable
-fun EntranceImage(path: String?, contentDescription: String, modifier: Modifier = Modifier) {
+fun EntranceImage(path: String?, contentDescription: String, modifier: Modifier = Modifier, illustration: Boolean = false) {
     val context = LocalContext.current
     val bitmap: ImageBitmap? = remember(path) {
         path?.let { p -> runCatching { context.assets.open("photos/$p").use { BitmapFactory.decodeStream(it)?.asImageBitmap() } }.getOrNull() }
     }
     val c = Atd.colors
     Box(modifier.clip(Corner).background(c.surfaceAlt).border(1.dp, c.line, Corner), contentAlignment = Alignment.Center) {
-        if (bitmap != null) Image(bitmap, contentDescription, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        if (bitmap != null) Image(bitmap, contentDescription, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
         else Text("등록된 입구 사진이 없어요", style = Type.body, color = c.inkMuted, textAlign = TextAlign.Center)
+        if (bitmap != null && illustration) {
+            Text(
+                "시연 일러스트 · 실제 사진 아님",
+                Modifier.align(Alignment.TopStart).padding(16.dp).clip(RoundedCornerShape(2.dp)).background(c.demoBg).padding(horizontal = 12.dp, vertical = 4.dp),
+                color = c.demo,
+                style = Type.badge,
+            )
+        }
     }
 }
 

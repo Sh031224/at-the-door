@@ -1,5 +1,6 @@
 package app.atthedoor.domain.plan
 
+import app.atthedoor.domain.model.Labels
 import app.atthedoor.domain.model.MobilityAid
 import app.atthedoor.domain.model.TravelConditions
 import app.atthedoor.domain.model.Venue
@@ -32,23 +33,23 @@ object ConditionParser {
         venue?.let { recognized += "목적지: ${it.name}" }
 
         if ("계단" in t && listOf("없이", "없는", "말고", "피해", "못", "힘들", "어려").any { it in t }) {
-            c = c.copy(stepFreeRequired = true); recognized += "계단 없는 동선"
+            c = c.copy(stepFreeRequired = true); recognized += Labels.STEP_FREE
         }
         if (listOf("가까이", "가까운", "조금만걷", "짧게", "오래못걷", "많이못걷", "멀리못걷", "천천히").any { it in t }) {
-            c = c.copy(preferShortWalk = true); recognized += "보행 거리 짧게"
+            c = c.copy(preferShortWalk = true); recognized += Labels.SHORT_WALK
         }
 
         val others = listOf("셋이", "넷이", "누나도", "형도", "동생도", "언니도", "오빠도", "아내도", "남편도", "같이내려", "다른보호자")
         val solo = listOf("둘이", "단둘", "나혼자", "나밖에", "나만")
         when {
             others.any { it in t } -> {
-                c = c.copy(companionRequired = true, otherGuardian = true); recognized += "다른 보호자와 함께"
+                c = c.copy(companionRequired = true, otherGuardian = true); recognized += Labels.OTHER_GUARDIAN
             }
             solo.any { it in t } -> {
-                c = c.copy(companionRequired = true, otherGuardian = false); recognized += "운전자와 입구까지 함께"
+                c = c.copy(companionRequired = true, otherGuardian = false); recognized += Labels.DRIVER_WITH
             }
             listOf("같이가", "함께가", "같이걸", "내가같이", "모시고").any { it in t } -> {
-                c = c.copy(companionRequired = true); recognized += "입구까지 동행"
+                c = c.copy(companionRequired = true); recognized += Labels.DRIVER_WITH
             }
         }
 

@@ -61,7 +61,7 @@ fun TopBar(venueName: String?, stage: Stage, demo: Boolean, onMore: () -> Unit, 
                 val active = s == stage
                 Column(Modifier.padding(horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        s.label,
+                        "${s.ordinal + 1} ${s.label}",
                         style = if (active) Type.label.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) else Type.label,
                         color = if (active) c.ink else if (s.ordinal < stage.ordinal) c.inkMuted else c.inkFaint,
                     )

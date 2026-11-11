@@ -26,8 +26,8 @@ data class Verdict(
 )
 
 enum class ConditionHint(val label: String) {
-    ADD_OTHER_GUARDIAN("다른 보호자가 함께하면 후보가 돼요"),
-    CONFIRM_PERMIT("장애인 주차 자격이 있으면 후보가 돼요"),
+    ADD_OTHER_GUARDIAN("‘다른 보호자도 있어요’면 후보가 돼요"),
+    CONFIRM_PERMIT("‘장애인 주차 표지 있음’이면 후보가 돼요"),
 }
 
 data class CandidateResult(

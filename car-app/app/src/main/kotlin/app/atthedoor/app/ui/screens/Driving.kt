@@ -51,7 +51,7 @@ fun DrivingScreen(state: TripUiState, onParkingFull: () -> Unit) {
     val phase = state.trip?.phase
     Column(Modifier.fillMaxSize().background(c.bg)) {
         state.replanned?.let { NoticeStrip(it, Tone.SUCCESS, large = true) }
-        Column(Modifier.weight(1f).padding(48.dp), verticalArrangement = Arrangement.spacedBy(28.dp)) {
+        Column(Modifier.weight(1f).padding(horizontal = 48.dp, vertical = 40.dp), verticalArrangement = Arrangement.spacedBy(32.dp, Alignment.CenterVertically)) {
             if (state.venue?.demo == true) DemoBadge(large = true)
             when {
                 plan == null || phase == TripPhase.PLANNING || phase == TripPhase.CHOOSING ->
@@ -70,12 +70,12 @@ fun DrivingScreen(state: TripUiState, onParkingFull: () -> Unit) {
                             Spacer(Modifier.width(20.dp))
                             Column {
                                 Text("다음 지점", style = Type.title, color = c.onInverse.copy(alpha = 0.8f))
-                                Text(plan.accessPoint.approach, style = Type.headline, color = c.onInverse)
+                                Text(shortPoint(plan.accessPoint.approach, state.venue), style = Type.drive, color = c.onInverse)
                             }
                         }
                     }) {
-                        Text(plan.name, style = Type.drive, color = c.onInverse)
-                        plan.walk.distanceM.takeIf { it.known }?.let { Text("주차 후 입구까지 약 ${it.value}m", style = Type.title, color = c.onInverse.copy(alpha = 0.8f)) }
+                        Text(plan.name, style = Type.hero, color = c.onInverse)
+                        plan.walk.distanceM.takeIf { it.known }?.let { Text("${walkPrefix(plan)} 입구까지 약 ${it.value}m", style = Type.driveSub, color = c.onInverse.copy(alpha = 0.85f)) }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(20.dp).background(if (phase == TripPhase.APPROACHING) c.success else c.caution))
@@ -97,7 +97,7 @@ fun DrivingScreen(state: TripUiState, onParkingFull: () -> Unit) {
             AtdButton(
                 "만차예요 · 다른 곳 찾기",
                 onParkingFull,
-                Modifier.fillMaxWidth().padding(horizontal = 48.dp, vertical = 32.dp),
+                Modifier.fillMaxWidth(),
                 kind = ButtonKind.REPORT,
                 icon = Glyph.Warning,
                 height = Touch.drive,

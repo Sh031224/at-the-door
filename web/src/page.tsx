@@ -74,6 +74,7 @@ export const GuidePage: FC<{ trip: StoredTrip; events: PhoneEvent[] }> = ({ trip
               {s.entrancePhotos.length > 0 && (
                 <figure class="photo">
                   <figcaption>{stage === "return" ? "나갈 문" : "도착할 입구"} · {s.entranceName}</figcaption>
+                  {s.photosAreIllustrations && <span class="illust">시연 일러스트 · 실제 사진 아님</span>}
                   <img src={`/photos/${s.entrancePhotos[0]}`} alt={s.photosAreIllustrations ? `${s.entranceName} 시연용 일러스트(실제 사진 아님)` : `${s.entranceName} 사진`} loading="lazy" />
                 </figure>
               )}
@@ -185,7 +186,7 @@ h1 { font-size: 28px; line-height: 1.3; margin: 0 0 4px; } h2 { font-size: 15px;
 .steps li { counter-increment: s; display:flex; gap: 12px; padding: 14px 16px; font-size: 20px; border-bottom: 1px solid var(--line); min-height: 56px; }
 .steps li:last-child { border-bottom: 0; }
 .steps li::before { content: counter(s); flex: 0 0 28px; height: 28px; border: 2px solid var(--primary); color: var(--primary); border-radius: 50%; font-size: 15px; font-weight: 700; display:flex; align-items:center; justify-content:center; margin-top: 2px; }
-.photo { margin: 16px 0 0; } .photo figcaption { font-size: 15px; color: var(--muted); margin-bottom: 6px; }
+.photo { margin: 16px 0 0; position: relative; } .photo .illust { position: absolute; left: 8px; top: 34px; background: var(--demo-bg); color: var(--demo-fg); font-size: 13px; font-weight: 700; padding: 2px 8px; border-radius: 2px; } .photo figcaption { font-size: 15px; color: var(--muted); margin-bottom: 6px; }
 .photo img { width: 100%; display:block; border: 1px solid var(--line); }
 .spot { background: var(--surface); border: 1px solid var(--line); padding: 20px 16px; margin-top: 16px; }
 .label { margin: 0; color: var(--muted); font-size: 15px; } .big { font-size: 40px; font-weight: 700; margin: 4px 0 8px; line-height: 1.2; }

@@ -18,9 +18,7 @@ def svg(title, sign, sign_color, door_label, ramp, steps_note, extra=""):
 <rect x="300" y="420" width="20" height="200" fill="#6b7480"/>
 {ramp_svg}
 {extra}
-<text x="600" y="740" font-size="30" fill="#223" text-anchor="middle" font-family="Apple SD Gothic Neo, sans-serif">{steps_note}</text>
-<rect x="20" y="20" width="560" height="64" rx="12" fill="#b3261e"/>
-<text x="300" y="64" font-size="32" fill="#fff" text-anchor="middle" font-family="Apple SD Gothic Neo, sans-serif" font-weight="700">데모 일러스트 · 실제 사진 아님</text>
+
 </svg>'''
 items = {
  "saebom-hall/e-back-1": svg("새봄문화회관 후문", "후문 →", "#1f5fbf", "후문 자동문", False, "파란 안내판을 지나 후문으로"),

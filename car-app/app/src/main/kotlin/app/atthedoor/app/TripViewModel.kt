@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import app.atthedoor.domain.model.Candidate
 import app.atthedoor.domain.model.Entrance
 import app.atthedoor.domain.model.Josa
+import app.atthedoor.domain.model.Labels
 import app.atthedoor.domain.model.PhotoKind
 import app.atthedoor.domain.model.TravelConditions
 import app.atthedoor.domain.model.Venue
@@ -180,8 +181,8 @@ class TripViewModel(private val c: AppContainer) : ViewModel() {
         confirmConditions()
         showReplanned(
             when (hint) {
-                ConditionHint.ADD_OTHER_GUARDIAN -> "‘다른 보호자와 함께’로 바꿔 다시 평가했어요"
-                ConditionHint.CONFIRM_PERMIT -> "‘장애인 주차 자격 확인함’으로 바꿔 다시 평가했어요"
+                ConditionHint.ADD_OTHER_GUARDIAN -> "‘다른 보호자도 있어요’로 바꿔 다시 골랐어요"
+                ConditionHint.CONFIRM_PERMIT -> "‘장애인 주차 표지 있음’으로 바꿔 다시 골랐어요"
             },
         )
     }
@@ -235,7 +236,7 @@ class TripViewModel(private val c: AppContainer) : ViewModel() {
         parsed.venueId?.let { if (it != s.venue?.id) selectVenue(it) }
         _state.update { it.copy(draft = parsed.conditions, voice = VoiceState(heard = text, recognized = parsed.recognized)) }
         reevaluate()
-        if (parsed.conditions.companionRequired && !parsed.recognized.any { "함께" in it || "동행" in it }) {
+        if (parsed.conditions.companionRequired && parsed.recognized.none { it == Labels.DRIVER_WITH || it == Labels.OTHER_GUARDIAN }) {
             c.voice.speak("차에서 내려 입구까지 함께 이동해야 하나요?")
         }
     }
@@ -511,7 +512,9 @@ class TripViewModel(private val c: AppContainer) : ViewModel() {
         val current = _state.value.trip ?: return
         val next = TripMachine.reduce(current, event, eventId)
         if (next == current) return
-        _state.update { it.copy(trip = next) }
+        // 사람이 다음 단계로 넘어가면 직전 재계획 문구는 지난 일이므로 지운다.
+        val clearReplan = next.phase != current.phase && next.phase in setOf(TripPhase.PARKED, TripPhase.VISITING, TripPhase.COMPLETED, TripPhase.CANCELLED, TripPhase.PLANNING)
+        _state.update { it.copy(trip = next, replanned = if (clearReplan) null else it.replanned) }
         viewModelScope.launch { c.tripStore.save(next) }
     }
 

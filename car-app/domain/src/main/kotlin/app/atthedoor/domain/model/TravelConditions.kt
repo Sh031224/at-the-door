@@ -35,18 +35,35 @@ data class TravelConditions(
      */
     val labels: List<String>
         get() = buildList {
-            if (effectiveStepFreeRequired) add("계단 없는 동선")
-            if (preferShortWalk) add("보행 거리 짧게")
-            if (companionRequired) add(if (otherGuardian) "다른 보호자와 함께" else "운전자와 입구까지 함께")
+            add(companionLabel)
+            if (effectiveStepFreeRequired) add(Labels.STEP_FREE)
+            if (preferShortWalk) add(Labels.SHORT_WALK)
         } + listOfNotNull(
             mobilityAid.takeIf { it != MobilityAid.NONE }?.label,
-            "장애인 주차 자격 확인함".takeIf { hasDisabledParkingPermit },
+            Labels.PERMIT.takeIf { hasDisabledParkingPermit },
         )
+
+    val companionLabel: String
+        get() = when {
+            !companionRequired -> Labels.ALONE_OK
+            otherGuardian -> Labels.OTHER_GUARDIAN
+            else -> Labels.DRIVER_WITH
+        }
 
     companion object {
         /** 할머니 자리 시나리오의 기본값: 운전자가 유일한 보호자, 계단 없이, 가까이 */
         val DEFAULT = TravelConditions(companionRequired = true, otherGuardian = false, stepFreeRequired = true, preferShortWalk = true)
     }
+}
+
+/** 조건 이름은 모든 화면에서 이 하나만 쓴다. */
+object Labels {
+    const val DRIVER_WITH = "제가 같이 내려요"
+    const val OTHER_GUARDIAN = "다른 보호자도 있어요"
+    const val ALONE_OK = "함께 가지 않아도 돼요"
+    const val STEP_FREE = "계단 없이"
+    const val SHORT_WALK = "짧게 걷기"
+    const val PERMIT = "장애인 주차 표지 있음"
 }
 
 val MobilityAid.isWheelchair: Boolean

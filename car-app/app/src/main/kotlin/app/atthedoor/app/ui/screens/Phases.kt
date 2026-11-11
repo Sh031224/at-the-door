@@ -56,6 +56,7 @@ import app.atthedoor.app.ui.theme.Type
 import app.atthedoor.domain.model.Candidate
 import app.atthedoor.domain.model.CandidateType
 import app.atthedoor.domain.model.Josa
+import app.atthedoor.domain.model.Labels
 import app.atthedoor.domain.model.TravelConditions
 import app.atthedoor.domain.model.Venue
 import app.atthedoor.domain.plan.CandidateResult
@@ -94,10 +95,13 @@ fun walkLabel(c: Candidate): String = buildString {
     )
 }
 
-fun companionLabel(c: TravelConditions): String = when {
-    !c.companionRequired -> "입구까지 함께 가지 않아도 돼요"
-    c.otherGuardian -> "다른 보호자도 함께해요"
-    else -> "제가 같이 내려요"
+/** 승하차 계획이면 ‘내린 뒤’, 주차 계획이면 ‘주차 후’ */
+fun walkPrefix(c: Candidate): String = if (c.type == CandidateType.DROPOFF) "내린 뒤" else "주차 후"
+
+/** ‘새봄문화회관 후문 주차장 입구’처럼 시설 이름이 앞에 붙은 지점 이름을 화면용으로 줄인다. */
+fun shortPoint(name: String, venue: Venue?): String {
+    val prefix = venue?.aliases.orEmpty().sortedByDescending { it.length }.firstOrNull { name.startsWith("$it ") }
+    return prefix?.let { name.removePrefix(it).trim() } ?: name
 }
 
 @Composable
@@ -120,21 +124,25 @@ fun PhaseBody(state: TripUiState, vm: TripViewModel, setupBlocked: Boolean, cue:
     }
 }
 
+/** 화면 밖 동작(마이크 권한, 전화 걸기)을 하단 바에서 부를 때 쓰는 콜백 */
+class PhaseCallbacks(val speak: () -> Unit, val dial: (String) -> Unit)
+
 /** 단계별 하단 세그먼트. 첫 번째가 주 동작(왼쪽 절반). */
-fun phaseActions(state: TripUiState, vm: TripViewModel, open: (Sheet) -> Unit): Pair<Segment, List<Segment>>? {
+fun phaseActions(state: TripUiState, vm: TripViewModel, cb: PhaseCallbacks, open: (Sheet) -> Unit): Pair<Segment, List<Segment>>? {
     val phase = state.trip?.phase ?: return null
     val more = Segment("더보기", { open(Sheet.MORE) }, icon = Glyph.More)
     return when (phase) {
-        TripPhase.PLANNING -> Segment("이 조건으로 계획 보기", vm::confirmConditions, SegmentKind.PRIMARY, Glyph.Arrow, enabled = state.venue != null) to emptyList()
+        TripPhase.PLANNING -> Segment("이 조건으로 계획 보기", vm::confirmConditions, SegmentKind.PRIMARY, Glyph.Arrow, enabled = state.venue != null) to
+            listOf(if (state.voice.listening) Segment("듣고 있어요 · 멈추기", vm::stopListening, icon = Glyph.Mic) else Segment("말로 정하기", cb.speak, icon = Glyph.Mic))
         TripPhase.CHOOSING -> {
             val focus = focusOf(state)
             if (focus == null) {
                 Segment("조건 바꾸기", vm::editConditions, SegmentKind.PRIMARY, Glyph.Edit) to listOf(Segment("다른 목적지 고르기", { vm.editConditions(); open(Sheet.VENUE) }))
             } else {
-                val others = (state.evaluation?.results?.size ?: 1) - 1
+                val others = state.evaluation?.selectable?.count { it.candidate.id != focus.candidate.id } ?: 0
                 val retry = state.trip.notice != null && focus.candidate.id == state.trip.selectedCandidateId
                 Segment(if (retry) "같은 계획으로 다시 안내" else "이 계획으로 안내", { vm.choosePlan(focus.candidate) }, SegmentKind.PRIMARY, Glyph.Navigate) to
-                    listOf(Segment("다른 계획 ${others}개 보기", { open(Sheet.OTHER_PLANS) }))
+                    listOf(Segment(if (others > 0) "다른 계획 ${others}개 보기" else "다른 후보 보기", { open(Sheet.OTHER_PLANS) }))
             }
         }
         TripPhase.NAVI_REQUESTED -> Segment(
@@ -144,7 +152,7 @@ fun phaseActions(state: TripUiState, vm: TripViewModel, open: (Sheet) -> Unit): 
         TripPhase.APPROACHING -> Segment("주차했어요", { vm.confirmParking(null) }, SegmentKind.PRIMARY, Glyph.Check) to
             listOf(Segment("만차예요 · 다른 곳 찾기", vm::reportParkingFull, SegmentKind.REPORT, Glyph.Warning), more)
         TripPhase.PARKED -> Segment("입구로 출발", vm::startWalking, SegmentKind.PRIMARY, Glyph.Walk) to buildList {
-            if (state.share is ShareState.Ready) add(Segment("휴대폰 없이 보기", vm::skipPhone))
+            if (state.share is ShareState.Ready) add(Segment("이 화면으로 안내 보기", vm::skipPhone))
             add(Segment("입구가 막혀 있어요", { vm.reportEntranceBlocked() }, SegmentKind.REPORT, Glyph.Warning))
         }
         TripPhase.WALKING -> Segment("입구에 도착했어요", vm::arrivedAtEntrance, SegmentKind.PRIMARY, Glyph.Check) to
@@ -153,14 +161,18 @@ fun phaseActions(state: TripUiState, vm: TripViewModel, open: (Sheet) -> Unit): 
         TripPhase.RETURNING -> Segment("차에 탔어요", vm::backInCar, SegmentKind.PRIMARY, Glyph.Check) to
             listOf(Segment("길이 막혀 있어요 · 다른 길 찾기", { vm.reportEntranceBlocked() }, SegmentKind.REPORT, Glyph.Warning))
         TripPhase.REPLANNING -> null
-        TripPhase.NEEDS_CHECK -> Segment("조건 바꾸기", { open(Sheet.CHANGE) }, SegmentKind.PRIMARY, Glyph.Edit) to
-            listOf(Segment("새로 계획하기", vm::startOver), Segment("외출 그만두기", vm::cancel))
+        TripPhase.NEEDS_CHECK -> {
+            val contact = state.venue?.contact
+            if (contact != null) Segment("시설에 전화", { cb.dial(contact) }, SegmentKind.PRIMARY, Glyph.Phone) to
+                listOf(Segment("조건 바꾸기", { open(Sheet.CHANGE) }, icon = Glyph.Edit), Segment("새로 계획하기", vm::startOver))
+            else Segment("조건 바꾸기", { open(Sheet.CHANGE) }, SegmentKind.PRIMARY, Glyph.Edit) to listOf(Segment("새로 계획하기", vm::startOver))
+        }
         TripPhase.COMPLETED -> if (state.trip.feedback == null) {
             val n = state.feedbackDraft.size
             Segment(if (n == 0) "안내대로였어요" else "${n}개 알려 주기", { vm.giveFeedback(state.feedbackDraft) }, SegmentKind.PRIMARY, Glyph.Check) to
-                listOf(Segment("새 외출 계획", vm::startOver))
-        } else Segment("새 외출 계획", vm::startOver, SegmentKind.PRIMARY, Glyph.Arrow) to emptyList()
-        TripPhase.CANCELLED -> Segment("새 외출 계획", vm::startOver, SegmentKind.PRIMARY, Glyph.Arrow) to emptyList()
+                listOf(Segment("새로 계획하기", vm::startOver))
+        } else Segment("새로 계획하기", vm::startOver, SegmentKind.PRIMARY, Glyph.Arrow) to emptyList()
+        TripPhase.CANCELLED -> Segment("새로 계획하기", vm::startOver, SegmentKind.PRIMARY, Glyph.Arrow) to emptyList()
     }
 }
 
@@ -171,7 +183,7 @@ fun phaseActions(state: TripUiState, vm: TripViewModel, open: (Sheet) -> Unit): 
 private fun PlanningBody(state: TripUiState, vm: TripViewModel, open: (Sheet) -> Unit) {
     val c = Atd.colors
     val d = state.draft
-    Column(verticalArrangement = Arrangement.spacedBy(32.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(28.dp)) {
         Row(
             Modifier.fillMaxWidth().background(c.surface).clickable { open(Sheet.VENUE) }.padding(horizontal = 32.dp, vertical = 20.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -182,93 +194,73 @@ private fun PlanningBody(state: TripUiState, vm: TripViewModel, open: (Sheet) ->
             Text("바꾸기", style = Type.label, color = c.route)
             Icon(Glyph.Chevron, null, tint = c.route, modifier = Modifier.size(36.dp))
         }
+        Text("차에서 내려 입구까지 누가 함께 가나요?", style = Type.display, color = c.ink)
         Row(horizontalArrangement = Arrangement.spacedBy(Gap)) {
-            Column(Modifier.width(LeftW), verticalArrangement = Arrangement.spacedBy(28.dp)) {
-                Text("차에서 내려 입구까지 누가 함께 가나요?", style = Type.display, color = c.ink)
-                Row(horizontalArrangement = Arrangement.spacedBy(Gap)) {
-                    ChoiceTile(
-                        "제가 같이 내려요", "주차하고 둘이 함께 걸어가요",
-                        selected = d.companionRequired && !d.otherGuardian,
-                        onClick = { vm.updateDraft(d.copy(companionRequired = true, otherGuardian = false)) },
-                        modifier = Modifier.weight(1f).heightIn(min = 260.dp), icon = Glyph.Pair,
-                    )
-                    ChoiceTile(
-                        "다른 보호자도 있어요", "주차하는 동안 곁에 있을 사람이 있어요",
-                        selected = d.companionRequired && d.otherGuardian,
-                        onClick = { vm.updateDraft(d.copy(companionRequired = true, otherGuardian = true)) },
-                        modifier = Modifier.weight(1f).heightIn(min = 260.dp), icon = Glyph.Group,
-                    )
-                }
-                AtdChip("입구까지 함께 가지 않아도 돼요", selected = !d.companionRequired, onClick = { vm.updateDraft(d.copy(companionRequired = false, otherGuardian = false)) })
-                Hairline()
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("나머지 조건", style = Type.label, color = c.inkMuted)
-                    Spacer(Modifier.weight(1f))
-                    AtdButton("바꾸기", { open(Sheet.CONDITIONS) }, kind = ButtonKind.QUIET, trailing = Glyph.Chevron, height = 76.dp)
-                }
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.clickable { open(Sheet.CONDITIONS) }) {
+            ChoiceTile(Labels.DRIVER_WITH, "주차하고 둘이 함께 걸어가요", d.companionRequired && !d.otherGuardian,
+                { vm.updateDraft(d.copy(companionRequired = true, otherGuardian = false)) }, Modifier.weight(1f).heightIn(min = 220.dp), icon = Glyph.Pair)
+            ChoiceTile(Labels.OTHER_GUARDIAN, "주차하는 동안 곁에 있을 사람이 있어요", d.companionRequired && d.otherGuardian,
+                { vm.updateDraft(d.copy(companionRequired = true, otherGuardian = true)) }, Modifier.weight(1f).heightIn(min = 220.dp), icon = Glyph.Group)
+            ChoiceTile(Labels.ALONE_OK, "혼자 입구까지 갈 수 있어요", !d.companionRequired,
+                { vm.updateDraft(d.copy(companionRequired = false, otherGuardian = false)) }, Modifier.weight(1f).heightIn(min = 220.dp), icon = Glyph.Person)
+        }
+        VoiceFeedback(state)
+        Panel(Modifier.fillMaxWidth(), padding = 28.dp, spacing = 16.dp) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("나머지 조건", style = Type.label, color = c.inkMuted)
+                Spacer(Modifier.width(24.dp))
+                FlowRow(Modifier.weight(1f).clickable { open(Sheet.CONDITIONS) }, horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     summaryChips(d, state.arrival.label).forEach { AtdChip(it, selected = false, onClick = null) }
                 }
-                Text("이동 조건은 이 차에만 저장되고 휴대폰 링크로 보내지 않아요.", style = Type.caption, color = c.inkMuted)
+                AtdButton("바꾸기", { open(Sheet.CONDITIONS) }, kind = ButtonKind.QUIET, trailing = Glyph.Chevron, height = 88.dp)
             }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Gap)) {
-                VoicePanel(state, vm)
-                PreviewPanel(state)
-            }
+            Hairline()
+            PreviewLine(state)
         }
+        Text("이동 조건은 이 차에만 저장되고 휴대폰 링크로 보내지 않아요.", style = Type.caption, color = c.inkMuted)
     }
 }
 
 private fun summaryChips(d: TravelConditions, arrival: String): List<String> = buildList {
-    add(if (d.stepFreeRequired) "계단 없이" else "계단 상관없음")
-    add(if (d.preferShortWalk) "짧게 걷기" else "거리 상관없음")
-    add(if (d.mobilityAid.label == "없음") "보조기구 없음" else d.mobilityAid.label)
-    if (d.hasDisabledParkingPermit) add("장애인 주차 자격 확인함")
+    add(if (d.stepFreeRequired) Labels.STEP_FREE else "계단 상관없음")
+    add(if (d.preferShortWalk) Labels.SHORT_WALK else "거리 상관없음")
+    add(if (d.mobilityAid == app.atthedoor.domain.model.MobilityAid.NONE) "보조기구 없음" else d.mobilityAid.label)
+    if (d.hasDisabledParkingPermit) add(Labels.PERMIT)
     add("도착 $arrival")
 }
 
+/** 조건을 바꿀 때마다 다시 계산한 결과를 한 줄로. 같은 결정을 두 번 묻지 않도록 카드가 아닌 줄로 둔다. */
 @Composable
-private fun PreviewPanel(state: TripUiState) {
+private fun PreviewLine(state: TripUiState) {
     val c = Atd.colors
     val rec = state.evaluation?.recommended
-    Panel {
+    Row(verticalAlignment = Alignment.CenterVertically) {
         Text("이 조건이면", style = Type.label, color = c.inkMuted)
+        Spacer(Modifier.width(24.dp))
         if (rec != null) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                VerdictBadge(VerdictKind.RECOMMENDED)
-                Spacer(Modifier.width(14.dp))
-                Text(rec.candidate.name, style = Type.title, color = c.ink)
-            }
-            Text("주차 후 입구까지 ${walkLabel(rec.candidate)}", style = Type.body, color = c.ink)
+            VerdictBadge(VerdictKind.RECOMMENDED)
+            Spacer(Modifier.width(14.dp))
+            Text("${rec.candidate.name} · ${walkPrefix(rec.candidate)} 입구까지 ${walkLabel(rec.candidate)}", style = Type.bodyStrong, color = c.ink)
         } else {
-            Text("조건에 맞는 확인된 계획이 아직 없어요", style = Type.title, color = c.caution)
+            Text("조건에 맞는 확인된 계획이 아직 없어요", style = Type.bodyStrong, color = c.caution)
         }
-        val others = state.evaluation?.selectable?.size?.minus(if (rec != null) 1 else 0) ?: 0
-        if (others > 0) Text("다른 가능한 계획 ${others}개", style = Type.caption, color = c.inkMuted)
     }
 }
 
+/** 음성 입력 상태. 버튼은 하단 바에 있고, 여기에는 들은 말과 맞춘 조건만 보여 준다. */
 @Composable
-private fun VoicePanel(state: TripUiState, vm: TripViewModel) {
+private fun VoiceFeedback(state: TripUiState) {
     val c = Atd.colors
     val v = state.voice
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val askMic = androidx.activity.compose.rememberLauncherForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
-    ) { granted -> if (granted) vm.startListening() else vm.micDenied() }
-    val speak = {
-        val granted = vm.isFake || androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO) ==
-            android.content.pm.PackageManager.PERMISSION_GRANTED
-        if (granted) vm.startListening() else askMic.launch(android.Manifest.permission.RECORD_AUDIO)
+    val (text, color) = when {
+        v.listening -> (v.partial?.let { "“$it”" } ?: "듣고 있어요… “엄마랑 둘이고, 계단 없이 가까이”처럼 말해 보세요") to c.ink
+        v.recognized.isNotEmpty() -> "“${v.heard}” → ${v.recognized.joinToString(" · ")}(으)로 맞췄어요" to c.success
+        v.error != null -> v.error to c.caution
+        else -> return
     }
-    Panel {
-        AtdButton(if (v.listening) "듣고 있어요 · 눌러서 멈추기" else "말로 정하기", if (v.listening) vm::stopListening else speak, Modifier.fillMaxWidth(), kind = ButtonKind.SECONDARY, icon = Glyph.Mic)
-        when {
-            v.listening -> Text(v.partial?.let { "“$it”" } ?: "듣고 있어요…", style = Type.body, color = c.ink)
-            v.recognized.isNotEmpty() -> Text("“${v.heard}”\n→ ${v.recognized.joinToString(" · ")}(으)로 맞췄어요", style = Type.body, color = c.success)
-            v.error != null -> Text(v.error, style = Type.body, color = c.caution)
-            else -> Text("“엄마랑 둘이고, 계단 없이 가까이”처럼 말해 보세요", style = Type.body, color = c.inkMuted)
-        }
+    Row(Modifier.fillMaxWidth().background(c.surface).padding(horizontal = 32.dp, vertical = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(Glyph.Mic, null, tint = color, modifier = Modifier.size(40.dp))
+        Spacer(Modifier.width(18.dp))
+        Text(text, style = Type.bodyStrong, color = color)
     }
 }
 
@@ -285,7 +277,7 @@ private fun ChoosingBody(state: TripUiState, vm: TripViewModel, open: (Sheet) ->
             Headline(
                 if (focus == null) "확인된 계획이 없어요" else "이 계획으로 갈까요?",
                 Modifier.weight(1f),
-                sub = (listOf(companionLabel(conditions)) + conditions.labels.filter { "함께" !in it }).joinToString(" · "),
+                sub = conditions.labels.joinToString(" · "),
             )
             if (state.trip?.phase == TripPhase.CHOOSING) AtdButton("조건 바꾸기", vm::editConditions, kind = ButtonKind.QUIET, trailing = Glyph.Chevron, height = 76.dp)
         }
@@ -319,13 +311,13 @@ private fun PlanHero(venue: Venue, r: CandidateResult, state: TripUiState, open:
         }
         Row(horizontalArrangement = Arrangement.spacedBy(36.dp)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                RouteStrip(r.candidate.accessPoint.approach, r.candidate.name, r.candidate.type == CandidateType.DROPOFF, entrance?.name ?: "입구 정보 없음", walk = null)
-                Text("주차 후 입구까지 ${walkLabel(r.candidate)}", style = Type.title, color = c.ink)
+                RouteStrip(shortPoint(r.candidate.accessPoint.approach, venue), r.candidate.name, r.candidate.type == CandidateType.DROPOFF, entrance?.name ?: "입구 정보 없음", walk = null)
+                Text("${walkPrefix(r.candidate)} 입구까지 ${walkLabel(r.candidate)}", style = Type.title, color = c.ink)
                 distinctReasons(r, others).forEach { ReasonLine(it, ReasonKind.OK) }
                 r.verdict.cautions.take(1).forEach { ReasonLine(it, ReasonKind.CHECK) }
                 AtdButton("왜 이 계획인가요", { open(Sheet.EVIDENCE) }, kind = ButtonKind.QUIET, trailing = Glyph.Chevron, height = 76.dp)
             }
-            EntranceImage(entrance?.photos?.firstOrNull(), "${entrance?.name ?: "입구"} 모습", Modifier.width(520.dp).aspectRatio(1.5f))
+            EntranceImage(entrance?.photos?.firstOrNull(), illustration = entrance?.photoKind == app.atthedoor.domain.model.PhotoKind.ILLUSTRATION, contentDescription = "${entrance?.name ?: "입구"} 모습", modifier = Modifier.width(520.dp).aspectRatio(1.5f))
         }
     }
 }
@@ -350,23 +342,23 @@ private fun ApproachBody(state: TripUiState, cue: HandoffCue?) {
     val plan = state.selected ?: return
     val entrance = state.selectedEntrance
     Column(verticalArrangement = Arrangement.spacedBy(28.dp)) {
-        if (cue != null) Headline("도착했나요? 주차했으면 아래 ‘주차했어요’를 눌러 주세요", sub = cue.message)
-        else Headline("${Josa.euroRo(plan.accessPoint.approach)} 가고 있어요")
+        val point = shortPoint(plan.accessPoint.approach, state.venue)
+        if (cue != null) Headline("주차했나요?", sub = cue.message)
+        else Headline("가고 있어요", sub = plan.name)
         Row(horizontalArrangement = Arrangement.spacedBy(Gap)) {
-            InverseBlock(Modifier.width(LeftW), sub = {
+            InverseBlock(Modifier.width(760.dp), sub = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(14.dp).background(c.success))
+                    Box(Modifier.size(14.dp).background(if (cue != null) c.inkFaint else c.success))
                     Spacer(Modifier.width(14.dp))
-                    Text("내비게이션 안내 중", style = Type.title, color = c.onInverse)
+                    Text(if (cue != null) "도착 지점 근처예요" else "내비게이션 안내 중", style = Type.title, color = c.onInverse)
                 }
             }) {
                 Text("다음 지점", style = Type.title, color = c.onInverse.copy(alpha = 0.8f))
-                Text(plan.accessPoint.approach, style = Type.headline, color = c.onInverse)
-                Text("계획 · ${plan.name}", style = Type.body, color = c.onInverse.copy(alpha = 0.8f))
+                Text(point, style = Type.headline, color = c.onInverse)
             }
             Panel(Modifier.weight(1f)) {
-                Text("주차 후 이렇게 가요", style = Type.label, color = c.inkMuted)
-                RouteStrip(plan.accessPoint.approach, plan.name, plan.type == CandidateType.DROPOFF, entrance?.name ?: "입구", walk = null, compact = true)
+                Text("${walkPrefix(plan)} 이렇게 가요", style = Type.label, color = c.inkMuted)
+                RouteStrip(point, plan.name, plan.type == CandidateType.DROPOFF, entrance?.name ?: "입구", walk = null, compact = true)
                 Text(walkLabel(plan), style = Type.bodyStrong, color = c.ink)
                 if (plan.liveAvailabilitySource == null && plan.type == CandidateType.PARKING) ReasonLine("빈자리는 현장에서 확인해요", ReasonKind.CHECK)
             }
@@ -383,7 +375,10 @@ private fun ParkedBody(state: TripUiState, vm: TripViewModel, setupBlocked: Bool
     val entrance = state.selectedEntrance
     val phoneOk = state.share !is ShareState.Skipped && state.share !is ShareState.Failed
     Column(verticalArrangement = Arrangement.spacedBy(28.dp)) {
-        Headline(if (phoneOk) "휴대폰으로 입구 안내를 이어 보세요" else "차 화면으로 ${entrance?.name ?: "입구"}까지 안내할게요")
+        Headline(
+            if (phoneOk) "휴대폰으로 입구 안내를 이어 보세요" else "차 화면으로 ${entrance?.name ?: "입구"}까지 안내할게요",
+            sub = if (phoneOk) "QR을 비춘 휴대폰을 챙겨 ‘입구로 출발’을 누르세요. 걸으면서 순서와 입구를 볼 수 있어요." else null,
+        )
         Row(horizontalArrangement = Arrangement.spacedBy(Gap)) {
             Panel(Modifier.width(560.dp)) {
                 when {
@@ -411,8 +406,10 @@ private fun ParkedBody(state: TripUiState, vm: TripViewModel, setupBlocked: Bool
                 }
             }
             Panel(Modifier.weight(1f)) {
-                EntranceImage(entrance?.photos?.firstOrNull(), "${entrance?.name ?: "입구"} 모습", Modifier.fillMaxWidth().height(300.dp))
-                StepList(plan.walk.steps)
+                Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+                    EntranceImage(entrance?.photos?.firstOrNull(), illustration = entrance?.photoKind == app.atthedoor.domain.model.PhotoKind.ILLUSTRATION, contentDescription = "${entrance?.name ?: "입구"} 모습", modifier = Modifier.width(360.dp).aspectRatio(1.2f))
+                    StepList(plan.walk.steps, Modifier.weight(1f))
+                }
                 Hairline()
                 ParkingNoteRow(state.trip?.parkingNote) { open(Sheet.PARKING_NOTE) }
             }
@@ -444,10 +441,10 @@ private fun WalkingBody(state: TripUiState, open: (Sheet) -> Unit) {
             sub = if (phone) "입구에 닿으면 휴대폰이나 이 화면에서 ‘입구에 도착했어요’를 눌러 주세요" else null,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(Gap)) {
-            EntranceImage(entrance?.photos?.firstOrNull(), "${entrance?.name ?: "입구"} 모습", Modifier.width(LeftW).aspectRatio(1.5f))
+            EntranceImage(entrance?.photos?.firstOrNull(), illustration = entrance?.photoKind == app.atthedoor.domain.model.PhotoKind.ILLUSTRATION, contentDescription = "${entrance?.name ?: "입구"} 모습", modifier = Modifier.width(LeftW).aspectRatio(1.5f))
             Panel(Modifier.weight(1f)) {
                 StepList(plan.walk.steps, style = Type.body)
-                Text("실내 위치는 추적하지 않아요. 지나갈 수 있는지는 현장에서 확인해 주세요.", style = Type.caption, color = c.inkMuted)
+                Text("통행 가능 여부는 현장에서 확인해 주세요.", style = Type.caption, color = c.inkMuted)
                 Hairline()
                 ParkingNoteRow(state.trip?.parkingNote) { open(Sheet.PARKING_NOTE) }
                 if (phone) AtdButton("QR 다시 보기", { open(Sheet.QR) }, kind = ButtonKind.QUIET, icon = Glyph.Qr, height = 76.dp)
@@ -461,14 +458,20 @@ private fun WalkingBody(state: TripUiState, open: (Sheet) -> Unit) {
 @Composable
 private fun VisitBody(state: TripUiState, open: (Sheet) -> Unit) {
     val c = Atd.colors
+    val note = state.trip?.parkingNote
     Column(verticalArrangement = Arrangement.spacedBy(32.dp)) {
-        Headline("입구 도착을 확인했어요. 좋은 시간 보내세요", sub = "문앞 안내는 건물 입구까지예요. 공연·진료 중에는 알림을 띄우지 않아요.")
-        Panel(Modifier.fillMaxWidth(), padding = 48.dp) {
-            Text("주차 위치", style = Type.label, color = c.inkMuted)
-            val note = state.trip?.parkingNote
-            if (note != null) Text(note, style = Type.hero, color = c.ink)
-            else AtdButton("주차 위치 남기기", { open(Sheet.PARKING_NOTE) }, kind = ButtonKind.SECONDARY, icon = Glyph.Parking)
-            Text("돌아갈 때 나갈 문 · ${state.selectedEntrance?.name ?: "입구"}", style = Type.title, color = c.ink)
+        Headline("입구 도착을 확인했어요. 좋은 시간 보내세요", sub = "문앞 안내는 건물 입구까지예요. 방문 중에는 알림을 띄우지 않아요.")
+        Panel(Modifier.fillMaxWidth(), padding = 40.dp, spacing = 0.dp) {
+            Text("주차한 곳", style = Type.label, color = c.inkMuted)
+            Text(state.selected?.name ?: "", style = Type.headline, color = c.ink)
+            if (note != null) Text(note, style = Type.hero, color = c.ink, modifier = Modifier.padding(top = 8.dp))
+            Spacer(Modifier.height(24.dp))
+            Hairline()
+            if (note == null) {
+                ListRow("층과 구역 남기기", subtitle = "돌아올 때 찾기 쉬워요", leading = { Icon(Glyph.Parking, null, Modifier.size(40.dp), tint = c.ink) }, onClick = { open(Sheet.PARKING_NOTE) })
+                Hairline()
+            }
+            ListRow("돌아갈 때 나갈 문", subtitle = state.selectedEntrance?.name ?: "입구", leading = { Icon(Glyph.Door, null, Modifier.size(40.dp), tint = c.ink) })
         }
     }
 }
@@ -482,14 +485,14 @@ private fun ReturnBody(state: TripUiState) {
     val entrance = state.selectedEntrance
     Column(verticalArrangement = Arrangement.spacedBy(28.dp)) {
         Row(verticalAlignment = Alignment.Bottom) {
-            Headline("차로 돌아가는 길", Modifier.weight(1f), sub = "지난번에 지나갔다고 지금도 열려 있다고 보장하지 않아요")
+            Headline("차로 돌아가는 길", Modifier.weight(1f), sub = "올 때 지나온 길이라도 지금 열려 있는지는 현장에서 확인해 주세요")
             Column(horizontalAlignment = Alignment.End) {
-                Text("주차 위치", style = Type.caption, color = c.inkMuted)
-                Text(state.trip?.parkingNote ?: "메모 없음", style = Type.headline, color = c.ink)
+                Text("주차한 곳", style = Type.caption, color = c.inkMuted)
+                Text(listOfNotNull(plan.name, state.trip?.parkingNote).joinToString(" · "), style = Type.title, color = c.ink)
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(Gap)) {
-            EntranceImage(entrance?.photos?.firstOrNull(), "${entrance?.name ?: "입구"} 모습", Modifier.width(LeftW).aspectRatio(1.5f))
+            EntranceImage(entrance?.photos?.firstOrNull(), illustration = entrance?.photoKind == app.atthedoor.domain.model.PhotoKind.ILLUSTRATION, contentDescription = "${entrance?.name ?: "입구"} 모습", modifier = Modifier.width(LeftW).aspectRatio(1.5f))
             Panel(Modifier.weight(1f)) {
                 Text("${Josa.euroRo(entrance?.name ?: "입구")} 나가서", style = Type.label, color = c.inkMuted)
                 if (plan.walk.returnSteps.isNotEmpty()) StepList(plan.walk.returnSteps)
@@ -538,7 +541,7 @@ private fun DoneBody(state: TripUiState, vm: TripViewModel) {
         }
         Headline("오늘 외출을 마쳤어요", sub = state.selected?.let { "이용한 계획 · ${it.name}" })
         if (trip.feedback == null) {
-            Text("안내와 다른 곳이 있었나요? (선택, 여러 개 고를 수 있어요)", style = Type.title, color = c.ink)
+            Text("안내와 다른 곳이 있었나요? 여러 개 골라도 돼요", style = Type.title, color = c.ink)
             Row(horizontalArrangement = Arrangement.spacedBy(Gap)) {
                 listOf(FeedbackKind.ENTRANCE to Glyph.Door, FeedbackKind.ROUTE to Glyph.Walk, FeedbackKind.PARKING to Glyph.Parking).forEach { (k, icon) ->
                     ChoiceTile(k.label, null, selected = k in state.feedbackDraft, onClick = { vm.toggleFeedback(k) }, modifier = Modifier.weight(1f).heightIn(min = 200.dp), icon = icon)
