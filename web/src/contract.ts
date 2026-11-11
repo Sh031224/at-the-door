@@ -26,6 +26,8 @@ export interface CreateTripRequest {
   noAlternative: boolean;
   /** 재계획으로 길이 바뀌었을 때 휴대폰 위에 보여 줄 한 줄. 예: "후문을 이용할 수 없어 정문으로 가는 길로 바꿨어요" */
   changeNote: string | null;
+  /** 지금 계획의 입구가 막혔다고 알려진 상태. 들어간 입구가 없으므로 입구 이름·사진·입구 기준 순서를 보여 주지 않는다 */
+  entranceBlocked: boolean;
   /** 대안이 없을 때 보여 줄 시설 연락처 */
   contact: string | null;
 }
@@ -73,7 +75,7 @@ export function isCreateTripRequest(v: unknown): v is CreateTripRequest {
     str("venueName") && str("planName") && str("entranceName") && str("evidenceLabel") &&
     strArr("entrancePhotos") && strArr("steps") && strArr("returnSteps") &&
     typeof o.photosAreIllustrations === "boolean" && typeof o.demo === "boolean" &&
-    str("walkSummary") && typeof o.noAlternative === "boolean" && (o.changeNote === null || str("changeNote")) &&
+    str("walkSummary") && typeof o.noAlternative === "boolean" && (o.changeNote === null || str("changeNote")) && typeof o.entranceBlocked === "boolean" &&
     (o.parkingNote === null || str("parkingNote")) &&
     (o.contact === null || str("contact"))
   );

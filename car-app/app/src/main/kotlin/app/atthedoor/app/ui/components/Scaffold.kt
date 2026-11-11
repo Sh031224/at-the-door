@@ -45,7 +45,7 @@ enum class Stage(val label: String) { PREPARE("준비"), DRIVE("가는 중"), WA
 /** 상단바: 앱 이름·목적지, 4단계, 시연 배지, 더보기. 앱 이름을 길게 누르면 시연 패널을 연다. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun TopBar(venueName: String?, stage: Stage, demo: Boolean, onMore: () -> Unit, onLogoLongPress: () -> Unit) {
+fun TopBar(venueName: String?, stage: Stage, demo: Boolean, onMore: () -> Unit, onLogoLongPress: () -> Unit, finished: Boolean = false) {
     val c = Atd.colors
     Column(Modifier.fillMaxWidth().background(c.surface)) {
         Row(Modifier.fillMaxWidth().height(Grid.topBar).padding(horizontal = Grid.margin), verticalAlignment = Alignment.CenterVertically) {
@@ -58,8 +58,8 @@ fun TopBar(venueName: String?, stage: Stage, demo: Boolean, onMore: () -> Unit, 
             Text(venueName?.let { "· $it" } ?: "", Modifier.widthIn(max = 520.dp), style = Type.body, color = c.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.weight(1f))
             Stage.entries.forEach { s ->
-                val active = s == stage
-                val done = s.ordinal < stage.ordinal
+                val active = s == stage && !finished
+                val done = s.ordinal < stage.ordinal || finished
                 Row(Modifier.padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         Modifier.size(34.dp).background(if (active) c.primary else androidx.compose.ui.graphics.Color.Transparent, androidx.compose.foundation.shape.CircleShape)

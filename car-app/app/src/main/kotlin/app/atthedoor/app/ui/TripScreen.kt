@@ -93,6 +93,7 @@ fun TripScreen(vm: TripViewModel, onSwitchMode: () -> Unit) {
                         demo = state.venue?.demo == true,
                         onMore = { sheet = Sheet.MORE },
                         onLogoLongPress = { sheet = Sheet.DEMO },
+                        finished = state.trip?.phase == TripPhase.COMPLETED,
                     )
                     Notices(state, vm::undoHint)
                     val scroll = rememberScrollState()

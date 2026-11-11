@@ -512,6 +512,7 @@ class TripViewModel(private val c: AppContainer) : ViewModel() {
             walkSummary = walkSummary(candidate),
             noAlternative = s.trip?.phase == TripPhase.NEEDS_CHECK,
             changeNote = s.replanned?.takeIf { s.trip?.phase in setOf(TripPhase.WALKING, TripPhase.RETURNING) },
+            entranceBlocked = entrance.id in s.trip?.blockedEntranceIds.orEmpty(),
         )
     }
 

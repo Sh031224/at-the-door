@@ -19,6 +19,7 @@ const snapshot: CreateTripRequest = {
   walkSummary: "주차 후 입구까지 약 80m · 계단 없음",
   noAlternative: false,
   changeNote: null,
+  entranceBlocked: false,
 };
 
 function setup(now = () => 1_000) {
@@ -155,4 +156,15 @@ test("재계획으로 길이 바뀌면 휴대폰 위에 바뀐 이유가 보인�
   const { token } = (await (await app.request("/api/trips", json(snapshot))).json()) as CreateTripResponse;
   await app.request(`/api/trips/${token}`, { ...json({ ...snapshot, entranceName: "정문", changeNote: "후문을 이용할 수 없어 정문으로 가는 길로 바꿨어요" }), method: "PUT" });
   assert.ok((await (await app.request(`/t/${token}`)).text()).includes("후문을 이용할 수 없어 정문으로 가는 길로 바꿨어요"));
+});
+
+test("입구가 모두 막힌 뒤 돌아갈 때는 막힌 입구 이름과 입구 기준 순서를 보여 주지 않는다", async () => {
+  const { app, json } = setup();
+  const { token } = (await (await app.request("/api/trips", json(snapshot))).json()) as CreateTripResponse;
+  await app.request(`/api/trips/${token}`, { ...json({ ...snapshot, entranceName: "정문", entranceBlocked: true }), method: "PUT" });
+  await app.request(`/api/trips/${token}/events`, json({ type: "returning" }));
+  const html = await (await app.request(`/t/${token}`)).text();
+  assert.match(html, /온 길을 되돌아/);
+  assert.doesNotMatch(html, /이용한 입구 · 정문/);
+  assert.doesNotMatch(html, /나갈 문/);
 });

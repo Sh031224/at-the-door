@@ -365,8 +365,9 @@ private fun ApproachBody(state: TripUiState, cue: HandoffCue?) {
     val entrance = state.selectedEntrance
     Column(verticalArrangement = Arrangement.spacedBy(28.dp)) {
         val point = shortPoint(plan.accessPoint.approach, state.venue)
-        if (cue != null) Headline(if (state.naviArrived) "주차했나요?" else "여기에 주차했나요?", sub = cue.message)
-        else Headline(state.route?.label?.let { "가고 있어요 · $it" } ?: "가고 있어요", sub = "${plan.name} · 안내를 시작할 때 내비가 알려 준 예상이에요".takeIf { state.route?.label != null } ?: plan.name)
+        // 차는 어디에 섰는지 모른다. ‘여기’ 대신 계획한 자리 이름으로 묻는다.
+        if (cue != null) Headline("${spotName(plan)}에 주차했나요?", sub = cue.message)
+        else Headline("가고 있어요", sub = state.route?.label?.let { "출발 때 예상 $it · 실시간 남은 거리는 내비 화면에서 보세요" } ?: plan.name)
         Row(horizontalArrangement = Arrangement.spacedBy(Gap)) {
             InverseBlock(Modifier.width(760.dp), sub = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -408,7 +409,7 @@ private fun ParkedBody(state: TripUiState, vm: TripViewModel, setupBlocked: Bool
     Column(verticalArrangement = Arrangement.spacedBy(28.dp)) {
         Headline(
             if (phoneOk) "휴대폰으로 입구 안내를 이어 보세요" else "차 화면으로 ${entrance?.name ?: "입구"}까지 안내할게요",
-            sub = if (phoneOk) "QR을 비춘 휴대폰을 챙겨 ‘입구로 출발’을 누르세요. 걸으면서 순서와 입구를 볼 수 있어요." else null,
+            sub = if (phoneOk) "휴대폰으로 QR을 찍은 뒤 ‘입구로 출발’을 누르세요. 걸으면서 순서와 입구를 볼 수 있어요." else null,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(Gap)) {
             Panel(Modifier.width(560.dp)) {
@@ -521,6 +522,18 @@ private fun ReturnBody(state: TripUiState) {
     val c = Atd.colors
     val plan = state.selected ?: return
     val entrance = state.selectedEntrance
+    if (entrance != null && entrance.id in state.trip?.blockedEntranceIds.orEmpty()) {
+        // 입구가 모두 막혀 들어가지 않았다. 막힌 입구 기준의 순서나 사진은 보여 주지 않는다.
+        Column(verticalArrangement = Arrangement.spacedBy(28.dp)) {
+            Headline("차로 돌아가는 길", sub = "입구가 막혀 들어가지 않았어요. 주차한 곳까지 온 길을 되돌아가세요. 지금 열려 있는지는 현장에서 확인해 주세요.")
+            Panel(Modifier.fillMaxWidth(), padding = 40.dp) {
+                Text("주차한 곳", style = Type.label, color = c.inkMuted)
+                Text(spotName(plan), style = Type.display, color = c.ink)
+                state.trip?.parkingNote?.let { Text(it, style = Type.hero, color = c.ink) }
+            }
+        }
+        return
+    }
     Column(verticalArrangement = Arrangement.spacedBy(28.dp)) {
         Row(verticalAlignment = Alignment.Bottom) {
             Headline("차로 돌아가는 길", Modifier.weight(1f), sub = "올 때 지나온 길이라도 지금 열려 있는지는 현장에서 확인해 주세요")

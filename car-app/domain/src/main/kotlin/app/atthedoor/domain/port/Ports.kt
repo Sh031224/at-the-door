@@ -101,6 +101,8 @@ data class TripSnapshot(
     val noAlternative: Boolean,
     /** 재계획으로 길이 바뀐 이유. 휴대폰 위에 한 줄로 보인다. */
     val changeNote: String?,
+    /** 지금 계획의 입구가 막혔다고 알려진 상태. 들어간 입구가 없으므로 입구 이름·사진·입구 기준 복귀 순서를 보여 주지 않는다. */
+    val entranceBlocked: Boolean = false,
 )
 
 data class ShareLink(val token: String, val url: String, val expiresAtEpochMs: Long)

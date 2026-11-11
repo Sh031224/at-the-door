@@ -10,7 +10,8 @@ export function stageOf(events: PhoneEvent[]): GuideStage {
   for (const e of events) {
     if (e.type === "arrived" && stage === "guide") stage = "visit";
     else if (e.type === "arrival_undone" && stage === "visit") stage = "guide";
-    else if (e.type === "returning" && stage === "visit") stage = "return";
+    // 입구가 모두 막혀 대안이 없을 때는 방문 없이 바로 돌아간다.
+    else if (e.type === "returning") stage = "return";
   }
   return stage;
 }
@@ -49,7 +50,7 @@ export const GuidePage: FC<{ trip: StoredTrip; events: PhoneEvent[] }> = ({ trip
       <p class="label">주차한 곳</p>
       <p class="mid">{spot}</p>
       {s.parkingNote && <p class="big">{s.parkingNote}</p>}
-      <p class="label">이용한 입구 · {s.entranceName}</p>
+      {!s.entranceBlocked && <p class="label">이용한 입구 · {s.entranceName}</p>}
     </section>
   );
   return (
@@ -74,6 +75,12 @@ export const GuidePage: FC<{ trip: StoredTrip; events: PhoneEvent[] }> = ({ trip
               <p class="sub">같은 조건으로 갈 수 있는 길을 찾지 못했어요. 없는 길을 만들어 안내하지 않아요.</p>
               {spotCard}
               {s.contact && <section class="spot"><p class="label">시설 연락처</p><p class="mid">{s.contact}{s.demo && " (시연용 번호)"}</p></section>}
+            </>
+          ) : stage === "return" && s.entranceBlocked ? (
+            <>
+              <h1>차로 돌아가는 길</h1>
+              <p class="sub">입구가 막혀 들어가지 않았어요. 주차한 곳까지 온 길을 되돌아가세요. 지금 열려 있는지는 현장에서 확인해 주세요.</p>
+              {spotCard}
             </>
           ) : stage === "visit" ? (
             <>
