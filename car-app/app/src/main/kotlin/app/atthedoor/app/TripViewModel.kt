@@ -192,10 +192,13 @@ class TripViewModel(private val c: AppContainer) : ViewModel() {
         voiceJob = viewModelScope.launch {
             var finalText: String? = null
             runCatching {
-                c.speech.listen().collect { r ->
-                    _state.update { it.copy(voice = it.voice.copy(partial = r.text)) }
-                    if (r.completed) finalText = r.text
-                }
+                // 말이 들리지 않으면 SDK가 끝내지 않을 수 있어 12초 뒤 멈추고 화면 입력으로 돌린다.
+                kotlinx.coroutines.withTimeoutOrNull(LISTEN_TIMEOUT_MS) {
+                    c.speech.listen().collect { r ->
+                        _state.update { it.copy(voice = it.voice.copy(partial = r.text)) }
+                        if (r.completed) finalText = r.text
+                    }
+                } ?: c.speech.stop()
             }.onFailure { e ->
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 _state.update { it.copy(voice = VoiceState(error = "음성을 알아듣지 못했어요. 화면에서 골라 주세요.")) }
@@ -512,6 +515,7 @@ class TripViewModel(private val c: AppContainer) : ViewModel() {
 
     companion object {
         const val DEFAULT_VENUE = "saebom-hall"
+        private const val LISTEN_TIMEOUT_MS = 12_000L
         private val HANDOFF_PHASES = setOf(TripPhase.PARKED, TripPhase.WALKING, TripPhase.VISITING, TripPhase.RETURNING)
         private fun newId() = UUID.randomUUID().toString()
     }
