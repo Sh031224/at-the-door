@@ -21,6 +21,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.atthedoor.app.DemoControls
 import app.atthedoor.app.NaviStatus
 import app.atthedoor.app.TripUiState
@@ -50,7 +51,7 @@ fun DrivingScreen(state: TripUiState, onParkingFull: () -> Unit) {
     val plan = state.selected
     val phase = state.trip?.phase
     Column(Modifier.fillMaxSize().background(c.bg)) {
-        state.replanned?.let { NoticeStrip(it, Tone.SUCCESS, large = true) }
+        state.replanned?.let { NoticeStrip(it, Tone.INFO, large = true) }
         Column(Modifier.weight(1f).padding(horizontal = 48.dp, vertical = 48.dp), verticalArrangement = Arrangement.spacedBy(32.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("문앞 · ${drivingStage(phase)}", style = Type.title, color = c.inkMuted)
@@ -71,6 +72,7 @@ fun DrivingScreen(state: TripUiState, onParkingFull: () -> Unit) {
                     // 턴바이턴처럼 지금 향하는 곳을 가장 크게, 계획 이름은 그 아래에 둔다.
                     InverseBlock(Modifier.fillMaxWidth(), sub = {
                         Column {
+                            state.route?.label?.takeIf { phase == TripPhase.APPROACHING }?.let { Text("남은 길 $it", style = Type.driveSub.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold), color = c.onInverse) }
                             Text(plan.name, style = Type.driveSub, color = c.onInverse)
                             plan.walk.distanceM.takeIf { it.known }?.let { Text("${walkPrefix(plan)} 입구까지 약 ${it.value}m", style = Type.title, color = c.onInverse.copy(alpha = 0.85f)) }
                         }
@@ -80,7 +82,7 @@ fun DrivingScreen(state: TripUiState, onParkingFull: () -> Unit) {
                             Spacer(Modifier.width(24.dp))
                             Column {
                                 Text("다음 지점", style = Type.title, color = c.onInverse.copy(alpha = 0.8f))
-                                Text(shortPoint(plan.accessPoint.approach, state.venue), style = Type.hero, color = c.onInverse)
+                                Text(shortPoint(plan.accessPoint.approach, state.venue), Modifier.padding(vertical = 12.dp), style = Type.hero.copy(fontSize = 92.sp, lineHeight = 108.sp), color = c.onInverse)
                             }
                         }
                     }
@@ -120,10 +122,10 @@ fun DrivingScreen(state: TripUiState, onParkingFull: () -> Unit) {
 
 /** 상단 4단계와 같은 이름으로 주행 화면 머리글을 만든다. */
 private fun drivingStage(phase: TripPhase?): String = when (phase) {
-    null, TripPhase.PLANNING, TripPhase.CHOOSING, TripPhase.NAVI_REQUESTED, TripPhase.NEEDS_CHECK -> "1 준비"
-    TripPhase.APPROACHING -> "2 가는 중"
-    TripPhase.PARKED, TripPhase.WALKING, TripPhase.VISITING, TripPhase.REPLANNING -> "3 입구까지"
-    TripPhase.RETURNING, TripPhase.COMPLETED, TripPhase.CANCELLED -> "4 돌아오기"
+    null, TripPhase.PLANNING, TripPhase.CHOOSING, TripPhase.NAVI_REQUESTED, TripPhase.NEEDS_CHECK -> "준비"
+    TripPhase.APPROACHING -> "가는 중"
+    TripPhase.PARKED, TripPhase.WALKING, TripPhase.VISITING, TripPhase.REPLANNING -> "입구까지"
+    TripPhase.RETURNING, TripPhase.COMPLETED, TripPhase.CANCELLED -> "돌아오기"
 }
 
 /** 모의 응답 모드 전용. 실제 SDK 모드에서는 에뮬레이터 Virtual Console로 같은 신호를 바꾼다. */

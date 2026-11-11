@@ -49,6 +49,13 @@ class TripMachineTest {
     }
 
     @Test
+    fun `계획과 다른 후보 지점에 세웠다고 알리면 그 지점의 동선으로 이어 간다`() {
+        val t = approaching().on(TripEvent.ParkingConfirmed(drivingRestricted = false, candidateId = "C"))
+        assertEquals(TripPhase.PARKED, t.phase)
+        assertEquals("C", t.selectedCandidateId)
+    }
+
+    @Test
     fun `주행 제한 중에는 주차 확인을 받지 않는다`() {
         val t = approaching().on(TripEvent.ParkingConfirmed(drivingRestricted = true))
         assertEquals(TripPhase.APPROACHING, t.phase)

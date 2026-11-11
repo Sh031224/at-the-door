@@ -365,21 +365,17 @@ fun BoxScope.SideSheet(title: String, onClose: () -> Unit, width: Dp = 760.dp, f
         }
         Hairline()
         val scroll = rememberScrollState()
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            Column(
-                Modifier.fillMaxSize().verticalScroll(scroll).padding(horizontal = 40.dp, vertical = 28.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp),
-                content = content,
-            )
-            // 아래에 내용이 더 있으면 흐린 띠와 안내로 알려 준다.
-            if (scroll.maxValue > 0 && scroll.value < scroll.maxValue) {
-                Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
-                    Box(Modifier.fillMaxWidth().height(40.dp).background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, c.surface))))
-                    Row(Modifier.fillMaxWidth().height(56.dp).background(c.surface), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                        Text("아래로 밀면 더 있어요", style = Type.caption, color = c.inkMuted)
-                        Icon(androidx.compose.material.icons.Icons.Outlined.KeyboardArrowDown, null, tint = c.inkMuted, modifier = Modifier.size(32.dp))
-                    }
-                }
+        Column(
+            Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll).padding(horizontal = 40.dp, vertical = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+            content = content,
+        )
+        // 아래에 내용이 더 있으면 본문 밖 별도 줄로 알려 준다. 내용 위에 겹치지 않는다.
+        if (scroll.maxValue > 0 && scroll.value < scroll.maxValue) {
+            Hairline()
+            Row(Modifier.fillMaxWidth().height(48.dp).background(c.surfaceAlt), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                Text("아래로 밀면 더 있어요", style = Type.caption, color = c.ink)
+                Icon(androidx.compose.material.icons.Icons.Outlined.KeyboardArrowDown, null, tint = c.ink, modifier = Modifier.size(32.dp))
             }
         }
         if (footer != null) {

@@ -32,7 +32,8 @@ sealed interface TripEvent {
      * 사용자가 ‘주차했어요’를 누름. [drivingRestricted]는 그 순간의 CarUxRestrictions 상태다.
      * 주행 제한 중이면 무시한다. [location]은 차량 기기 안에만 저장한다.
      */
-    data class ParkingConfirmed(val drivingRestricted: Boolean, val note: String? = null, val location: GeoPoint? = null) : TripEvent
+    /** [candidateId]가 있으면 계획과 다른 후보 지점에 세웠다는 뜻. 그 지점의 보행 동선으로 이어 간다. */
+    data class ParkingConfirmed(val drivingRestricted: Boolean, val note: String? = null, val location: GeoPoint? = null, val candidateId: String? = null) : TripEvent
     data object WalkStarted : TripEvent
     /** 사람이 직접 누른 ‘입구에 도착했어요’. 도어 열림·목적지 근접 신호로 만들지 않는다. */
     data object ArrivedAtEntrance : TripEvent
@@ -103,7 +104,13 @@ object TripMachine {
 
         is TripEvent.ParkingConfirmed ->
             if (t.phase == APPROACHING && !e.drivingRestricted) {
-                t.copy(phase = PARKED, parkingNote = e.note ?: t.parkingNote, parkedAt = e.location ?: t.parkedAt, notice = null)
+                t.copy(
+                    phase = PARKED,
+                    selectedCandidateId = e.candidateId ?: t.selectedCandidateId,
+                    parkingNote = e.note ?: t.parkingNote,
+                    parkedAt = e.location ?: t.parkedAt,
+                    notice = null,
+                )
             } else null
 
         TripEvent.WalkStarted -> if (t.phase == PARKED) t.copy(phase = WALKING, notice = null) else null

@@ -84,7 +84,7 @@ export const GuidePage: FC<{ trip: StoredTrip; events: PhoneEvent[] }> = ({ trip
             </>
           ) : (
             <>
-              {s.changeNote && <p class="changed">✓ {s.changeNote}</p>}
+              {stage === "guide" && s.changeNote && <p class="changed">ⓘ {s.changeNote}</p>}
               <h1>{stage === "return" ? "차로 돌아가는 길" : `${s.entranceName}${/[가-힣]$/.test(s.entranceName) && ((s.entranceName.charCodeAt(s.entranceName.length - 1) - 0xac00) % 28 === 0 || (s.entranceName.charCodeAt(s.entranceName.length - 1) - 0xac00) % 28 === 8) ? "로" : "으로"} 가요`}</h1>
               <p class="sub">{stage === "return" ? `${spot}으로 돌아가요` : s.walkSummary}</p>
 
@@ -192,8 +192,7 @@ if (form) form.addEventListener("submit", (e) => {
 `;
 
 const css = `
-:root { color-scheme: light dark; --bg:#F0F0F0; --surface:#FFFFFF; --line:#D6D6D6; --fg:#111111; --muted:#555555; --primary:#002C5F; --on-primary:#FFFFFF; --report:#A84300; --demo-bg:#FFE9A8; --demo-fg:#6B4E00; }
-@media (prefers-color-scheme: dark) { :root { --bg:#0B0B0C; --surface:#161718; --line:#34363A; --fg:#F2F2F2; --muted:#A9ABAF; --primary:#2D6CB5; --on-primary:#FFFFFF; --report:#FF9A5C; --demo-bg:#3A3010; --demo-fg:#FFE08A; } }
+:root { color-scheme: light; --bg:#F0F0F0; --surface:#FFFFFF; --line:#D6D6D6; --fg:#111111; --muted:#555555; --primary:#002C5F; --on-primary:#FFFFFF; --report:#A84300; --demo-bg:#FFE9A8; --demo-fg:#6B4E00; }
 * { box-sizing: border-box; }
 html, body { overflow-x: hidden; }
 body { margin:0; font: 18px/1.55 system-ui, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; color:var(--fg); background:var(--bg); font-variant-numeric: tabular-nums; }
@@ -214,8 +213,7 @@ h1 { font-size: 28px; line-height: 1.3; margin: 0 0 4px; } h2 { font-size: 15px;
 details.row { margin-top: 16px; background: var(--surface); border: 1px solid var(--line); }
 details.row summary { list-style: none; display:flex; justify-content: space-between; align-items:center; padding: 0 16px; min-height: 56px; cursor: pointer; }
 details.row summary b { color: var(--fg); } details.row summary b::after { content: "  바꾸기 ›"; color: var(--primary); font-weight: 500; }
-.changed { background: #0F2A1E; color: #6FD39A; padding: 12px 14px; margin: 0 0 12px; min-height: 48px; font-weight: 600; border-radius: 4px; }
-@media (prefers-color-scheme: light) { .changed { background: #E3F3E8; color: #1B7A3E; } }
+.changed { background: #E6EDF5; color: #002C5F; border-left: 4px solid #002C5F; padding: 12px 14px; margin: 0 0 12px; min-height: 48px; font-weight: 600; border-radius: 4px; }
 details.row form { display:flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 16px; }
 details.row input { flex: 1; min-width: 0; font-size: 17px; padding: 12px; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: var(--fg); }
 details.row form button { flex: 0 0 auto; }

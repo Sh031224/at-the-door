@@ -193,7 +193,7 @@ class PlanEvaluator {
     }
 
     private fun cautions(c: Candidate): List<String> = buildList {
-        if (c.liveAvailabilitySource == null && c.type == CandidateType.PARKING) add("주차 여유 공간은 현장에서 확인해야 해요")
+        if (c.liveAvailabilitySource == null && c.type == CandidateType.PARKING) add("빈자리는 현장에서 확인해야 해요")
         if (!c.walk.distanceM.known) add("보행 거리는 확인된 값이 없어요")
     }
 }

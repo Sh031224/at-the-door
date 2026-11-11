@@ -1,5 +1,6 @@
 package app.atthedoor.app.ui.screens
 
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -133,7 +134,6 @@ class PhaseCallbacks(val speak: () -> Unit, val dial: (String) -> Unit, val open
 /** 단계별 하단 세그먼트. 첫 번째가 주 동작(왼쪽 절반). */
 fun phaseActions(state: TripUiState, vm: TripViewModel, cb: PhaseCallbacks, open: (Sheet) -> Unit): Pair<Segment, List<Segment>>? {
     val phase = state.trip?.phase ?: return null
-    val more = Segment("더보기", { open(Sheet.MORE) }, icon = Glyph.More)
     return when (phase) {
         TripPhase.PLANNING -> Segment("이 조건으로 계획 보기", vm::confirmConditions, SegmentKind.PRIMARY, Glyph.Arrow, enabled = state.venue != null) to
             listOf(if (state.voice.listening) Segment("듣고 있어요 · 멈추기", vm::stopListening, icon = Glyph.Mic) else Segment("말로 정하기", cb.speak, icon = Glyph.Mic))
@@ -142,7 +142,8 @@ fun phaseActions(state: TripUiState, vm: TripViewModel, cb: PhaseCallbacks, open
             if (focus == null) {
                 Segment("조건 바꾸기", vm::editConditions, SegmentKind.PRIMARY, Glyph.Edit) to listOf(Segment("다른 목적지 고르기", { vm.editConditions(); open(Sheet.VENUE) }))
             } else {
-                val others = state.evaluation?.selectable?.count { it.candidate.id != focus.candidate.id } ?: 0
+                // 시트에 보이는 줄 수(가능 + 확인 필요)와 같게 센다. 추천하지 않는 곳은 시트 안에서 따로 접어 둔다.
+                val others = state.evaluation?.results?.count { it.verdict.kind != VerdictKind.EXCLUDED && it.candidate.id != focus.candidate.id } ?: 0
                 val retry = state.trip.notice != null && focus.candidate.id == state.trip.selectedCandidateId
                 Segment(if (retry) "같은 계획으로 다시 안내" else "이 계획으로 안내", { vm.choosePlan(focus.candidate) }, SegmentKind.PRIMARY, Glyph.Navigate) to
                     listOf(Segment(if (others > 0) "다른 계획 ${others}개 보기" else "다른 후보 보기", { open(Sheet.OTHER_PLANS) }))
@@ -155,15 +156,13 @@ fun phaseActions(state: TripUiState, vm: TripViewModel, cb: PhaseCallbacks, open
         // 도착 신호(기어 P 변화, 내비 도착) 전에는 ‘주차했어요’를 맨 앞에 두지 않는다. 출발 직후 잘못 누르지 않게 한다.
         TripPhase.APPROACHING -> if (cb.cue != null || state.naviArrived) {
             Segment("주차했어요", { vm.confirmParking(null) }, SegmentKind.PRIMARY, Glyph.Check) to
-                listOf(Segment("만차예요 · 다른 곳 찾기", vm::reportParkingFull, SegmentKind.REPORT, Glyph.Warning), more)
+                listOf(Segment("만차예요 · 다른 곳 찾기", vm::reportParkingFull, SegmentKind.REPORT, Glyph.Warning))
         } else {
             Segment("내비 화면 보기", cb.openNavi, SegmentKind.PRIMARY, Glyph.Navigate) to
-                listOf(Segment("주차했어요", { vm.confirmParking(null) }, icon = Glyph.Check), more)
+                listOf(Segment("주차했어요", { vm.confirmParking(null) }, icon = Glyph.Check))
         }
-        TripPhase.PARKED -> Segment("입구로 출발", vm::startWalking, SegmentKind.PRIMARY, Glyph.Walk) to buildList {
-            if (state.share is ShareState.Ready) add(Segment("휴대폰 없이 진행", vm::skipPhone))
-            add(more)
-        }
+        TripPhase.PARKED -> Segment("입구로 출발", vm::startWalking, SegmentKind.PRIMARY, Glyph.Walk) to
+            listOfNotNull(Segment("휴대폰 없이 진행", vm::skipPhone).takeIf { state.share is ShareState.Ready })
         TripPhase.WALKING -> Segment("입구에 도착했어요", vm::arrivedAtEntrance, SegmentKind.PRIMARY, Glyph.Check) to
             listOf(Segment("입구가 막혀 있어요 · 다른 입구 찾기", { vm.reportEntranceBlocked() }, SegmentKind.REPORT, Glyph.Warning))
         TripPhase.VISITING -> Segment("차로 돌아가기", vm::startReturn, SegmentKind.PRIMARY, Glyph.Car) to listOf(Segment("아직 도착하지 않았어요", vm::undoArrival))
@@ -223,7 +222,11 @@ private fun PlanningBody(state: TripUiState, vm: TripViewModel, open: (Sheet) ->
             Hairline()
             PreviewLine(state)
         }
-        Text("이동 조건은 이 차에만 저장되고 휴대폰 링크로 보내지 않아요.", style = Type.caption, color = c.inkMuted)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(androidx.compose.material.icons.Icons.Outlined.Lock, null, tint = c.ink, modifier = Modifier.size(28.dp))
+            Spacer(Modifier.width(12.dp))
+            Text("이동 조건은 이 차에만 저장되고 휴대폰 링크로 보내지 않아요.", style = Type.caption, color = c.ink)
+        }
     }
 }
 
@@ -355,7 +358,7 @@ private fun ApproachBody(state: TripUiState, cue: HandoffCue?) {
     val entrance = state.selectedEntrance
     Column(verticalArrangement = Arrangement.spacedBy(28.dp)) {
         val point = shortPoint(plan.accessPoint.approach, state.venue)
-        if (cue != null) Headline(if (state.naviArrived) "주차했나요?" else "여기에 주차했나요?", sub = cue.message)
+        if (cue != null) Headline(if (state.naviArrived) "주차했나요?" else "여기에 주차했나요?", sub = "${cue.message}\n다른 곳에 세웠으면 오른쪽 위 ⋯에서 ‘다른 곳에 세웠어요’를 골라 주세요.")
         else Headline(state.route?.label?.let { "가고 있어요 · $it" } ?: "가고 있어요", sub = "${plan.name} · 안내를 시작할 때 내비가 알려 준 예상이에요".takeIf { state.route?.label != null } ?: plan.name)
         Row(horizontalArrangement = Arrangement.spacedBy(Gap)) {
             InverseBlock(Modifier.width(760.dp), sub = {
@@ -380,7 +383,7 @@ private fun ApproachBody(state: TripUiState, cue: HandoffCue?) {
                 Text("${walkPrefix(plan)} 이렇게 가요", style = Type.label, color = c.inkMuted)
                 RouteStrip(point, plan.name, plan.type == CandidateType.DROPOFF, entrance?.name ?: "입구", walk = null, compact = true)
                 Text(walkLabel(plan), style = Type.bodyStrong, color = c.ink)
-                if (plan.liveAvailabilitySource == null && plan.type == CandidateType.PARKING) ReasonLine("빈자리는 현장에서 확인해요", ReasonKind.CHECK)
+                if (plan.liveAvailabilitySource == null && plan.type == CandidateType.PARKING) ReasonLine("빈자리는 현장에서 확인해야 해요", ReasonKind.CHECK)
                 EntranceImage(entrance?.photos?.firstOrNull(), illustration = entrance?.photoKind == app.atthedoor.domain.model.PhotoKind.ILLUSTRATION, contentDescription = "${entrance?.name ?: "입구"} 모습", modifier = Modifier.fillMaxWidth().aspectRatio(2f))
             }
         }
@@ -458,8 +461,12 @@ private fun WalkingBody(state: TripUiState, open: (Sheet) -> Unit) {
     val phone = state.share is ShareState.Ready
     Column(verticalArrangement = Arrangement.spacedBy(28.dp)) {
         Headline(
-            if (phone) "휴대폰 링크로 이어서 안내해요" else "${Josa.euroRo(entrance?.name ?: "입구")} 가요",
-            sub = if (phone) "입구에 닿으면 휴대폰이나 이 화면에서 ‘입구에 도착했어요’를 눌러 주세요" else null,
+            "${Josa.euroRo(entrance?.name ?: "입구")} 가요",
+            sub = listOfNotNull(
+                "${walkPrefix(plan)} ${walkLabel(plan)}",
+                if (phone) "휴대폰 링크로 이어서 안내해요" else null,
+                "도착하면 ‘입구에 도착했어요’",
+            ).joinToString(" · "),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(Gap)) {
             EntranceImage(entrance?.photos?.firstOrNull(), illustration = entrance?.photoKind == app.atthedoor.domain.model.PhotoKind.ILLUSTRATION, contentDescription = "${entrance?.name ?: "입구"} 모습", modifier = Modifier.width(LeftW).aspectRatio(1.5f))
@@ -489,7 +496,7 @@ private fun VisitBody(state: TripUiState, open: (Sheet) -> Unit) {
             Spacer(Modifier.height(24.dp))
             Hairline()
             ListRow(
-                if (note == null) "층과 구역 · 지금 남기기" else "층과 구역 · $note",
+                if (note == null) "주차 위치 남기기 (선택)" else "주차 위치 · $note",
                 subtitle = if (note == null) "돌아올 때 찾기 쉬워요" else null,
                 leading = { Icon(Glyph.Parking, null, Modifier.size(40.dp), tint = c.ink) },
                 onClick = { open(Sheet.PARKING_NOTE) },

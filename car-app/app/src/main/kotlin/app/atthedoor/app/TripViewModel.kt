@@ -388,11 +388,12 @@ class TripViewModel(private val c: AppContainer) : ViewModel() {
 
     // ── S05~S08 주차 확인, 휴대폰 안내, 방문, 복귀 ──────────
 
-    fun confirmParking(note: String?) {
+    /** [candidateId]: 계획과 다른 후보 지점에 세웠을 때 그 후보. 사람이 고른 것만 반영한다. */
+    fun confirmParking(note: String?, candidateId: String? = null) {
         if (drivingRestricted.value) return
         viewModelScope.launch {
             val location = c.location.current()
-            dispatch(TripEvent.ParkingConfirmed(drivingRestricted = drivingRestricted.value, note = note, location = location))
+            dispatch(TripEvent.ParkingConfirmed(drivingRestricted = drivingRestricted.value, note = note, location = location, candidateId = candidateId))
             if (_state.value.trip?.phase == TripPhase.PARKED) {
                 c.voice.speak("입구 안내를 휴대폰에서 이어 볼 수 있어요.")
                 createShareLink()

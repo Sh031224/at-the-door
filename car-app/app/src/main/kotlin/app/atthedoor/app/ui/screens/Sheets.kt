@@ -40,6 +40,8 @@ import app.atthedoor.app.ui.components.SideSheet
 import app.atthedoor.app.ui.components.VerdictBadge
 import app.atthedoor.app.ui.theme.Atd
 import app.atthedoor.app.ui.theme.Type
+import app.atthedoor.domain.model.CandidateType
+import app.atthedoor.domain.model.Josa
 import app.atthedoor.domain.model.Labels
 import app.atthedoor.domain.model.MobilityAid
 import app.atthedoor.domain.model.TravelConditions
@@ -48,7 +50,7 @@ import app.atthedoor.domain.plan.VerdictKind
 import app.atthedoor.domain.trip.TripPhase
 
 /** 매번 볼 필요가 없는 정보와 덜 쓰는 동작은 오른쪽 시트로 보낸다. */
-enum class Sheet { VENUE, CONDITIONS, CHANGE, OTHER_PLANS, EVIDENCE, PARKING_NOTE, QR, MORE, DEMO }
+enum class Sheet { VENUE, CONDITIONS, CHANGE, OTHER_PLANS, EVIDENCE, PARKING_NOTE, QR, MORE, PARKED_ELSEWHERE, DEMO }
 
 @Composable
 fun BoxScope.Sheets(sheet: Sheet, state: TripUiState, vm: TripViewModel, onClose: () -> Unit, open: (Sheet) -> Unit, onSwitchMode: () -> Unit) {
@@ -93,9 +95,11 @@ fun BoxScope.Sheets(sheet: Sheet, state: TripUiState, vm: TripViewModel, onClose
             val results = state.evaluation?.results.orEmpty()
             val focusId = focusOf(state)?.candidate?.id
             results.filter { it.verdict.kind != VerdictKind.EXCLUDED && it.candidate.id != focusId }.forEach { r ->
+                // 같은 주차 구역이 다른 입구와 짝지어 여러 번 나온다. 제목에 세우는 곳과 들어갈 입구를 함께 둔다.
+                val entranceName = state.venue?.entrance(r.candidate.walk.toEntranceId)?.name
                 ListRow(
-                    r.candidate.name,
-                    subtitle = if (r.selectable) walkLabel(r.candidate) else r.verdict.reasons.firstOrNull(),
+                    entranceName?.let { "${spotName(r.candidate)} · ${Josa.euroRo(it)}" } ?: r.candidate.name,
+                    subtitle = if (r.selectable) "${walkPrefix(r.candidate)} 입구까지 ${walkLabel(r.candidate)}" else r.verdict.reasons.firstOrNull() ?: "확인 필요",
                     leading = { VerdictBadge(r.verdict.kind) },
                     trailing = if (r.selectable) ({ AtdButton("이 계획으로 안내", { vm.choosePlan(r.candidate); onClose() }, kind = ButtonKind.SECONDARY, height = 88.dp) }) else null,
                 )
@@ -123,7 +127,7 @@ fun BoxScope.Sheets(sheet: Sheet, state: TripUiState, vm: TripViewModel, onClose
                 val entrance = state.venue?.entrance(r.candidate.walk.toEntranceId)
                 Text(r.candidate.name, style = Type.headline, color = Atd.colors.ink)
                 r.verdict.reasons.forEach { ReasonLine(it, ReasonKind.OK) }
-                r.verdict.cautions.forEach { ReasonLine("현장 확인 · $it", ReasonKind.CHECK) }
+                r.verdict.cautions.forEach { ReasonLine(it, ReasonKind.CHECK) }
                 Hairline()
                 val e = r.evidence
                 LabelValue("근거", e?.let { if (it.status == VerificationStatus.DEMO) "${it.source}, ${it.checkedAt}" else "${it.label} (${statusLabel(it.status)})" } ?: "확인된 정보 없음", valueStyle = Type.body)
@@ -141,6 +145,8 @@ fun BoxScope.Sheets(sheet: Sheet, state: TripUiState, vm: TripViewModel, onClose
         Sheet.MORE -> SideSheet("더보기", onClose) {
             val phase = state.trip?.phase
             if (phase == TripPhase.APPROACHING) {
+                ListRow("다른 곳에 세웠어요", subtitle = "실제로 세운 곳을 고르면 거기서 입구까지 다시 안내해요", leading = { Icon(Glyph.Parking, null, Modifier.size(40.dp)) }, onClick = { open(Sheet.PARKED_ELSEWHERE) })
+                Hairline()
                 ListRow("내비 다시 안내", subtitle = "같은 계획으로 다시 보내요", leading = { Icon(Glyph.Refresh, null, Modifier.size(40.dp)) }, onClick = { vm.retryNavigationFromApproach(); onClose() })
                 Hairline()
             }
@@ -171,6 +177,27 @@ fun BoxScope.Sheets(sheet: Sheet, state: TripUiState, vm: TripViewModel, onClose
                 }
                 Hairline()
             }
+        }
+        Sheet.PARKED_ELSEWHERE -> SideSheet("어디에 세웠나요?", onClose) {
+            // 위치 신호로 추정하지 않는다. 시설 데이터에 있는 지점 가운데 사람이 고른 곳만 받는다.
+            val selectedId = state.trip?.selectedCandidateId
+            val spots = state.evaluation?.results.orEmpty().filter { it.selectable && it.candidate.id != selectedId }
+            Text("세운 곳을 고르면 그 자리에서 입구까지의 동선으로 바꿔요.", style = Type.body, color = Atd.colors.inkMuted)
+            spots.forEach { r ->
+                val entranceName = state.venue?.entrance(r.candidate.walk.toEntranceId)?.name ?: "입구"
+                ListRow(
+                    spotName(r.candidate),
+                    subtitle = "${Josa.euroRo(entranceName)} · ${walkLabel(r.candidate)}",
+                    leading = { Icon(if (r.candidate.type == CandidateType.DROPOFF) Glyph.Person else Glyph.Parking, null, Modifier.size(40.dp)) },
+                    trailing = { AtdButton("여기에 세웠어요", { vm.confirmParking(null, r.candidate.id); onClose() }, kind = ButtonKind.SECONDARY, height = 88.dp) },
+                )
+                Hairline()
+            }
+            Text(
+                if (spots.isEmpty()) "이 조건으로 확인된 다른 지점이 없어요. 목록에 없는 곳은 입구까지 안내할 수 없어요." else "목록에 없는 곳이면 입구까지 안내할 수 없어요.",
+                style = Type.body, color = Atd.colors.ink,
+            )
+            state.venue?.contact?.let { LabelValue("시설 연락처", if (state.venue.demo) "$it (시연용 번호)" else it, valueStyle = Type.title) }
         }
         Sheet.DEMO -> SideSheet("시연 설정", onClose) {
             Text(if (vm.isFake) "지금은 모의 응답 모드예요. 차량·내비 SDK 대신 가짜 구현을 써요." else "지금은 실제 Pleos SDK 모드예요.", style = Type.body, color = Atd.colors.ink)
@@ -237,7 +264,7 @@ private fun ParkingNotePicker(note: String?, knownFloors: List<String>, onSave: 
     val floor = note?.split(" ")?.firstOrNull()?.takeIf { it in floors } ?: picked ?: floors.singleOrNull()
     Text(note ?: "아직 남기지 않았어요", style = Type.headline, color = Atd.colors.ink)
     if (floors.size == 1) {
-        Text("층 · ${floors.first()}", style = Type.title, color = Atd.colors.ink)
+        LabelValue("층", if (floors.first() == "지상") "지상 주차장" else floors.first(), valueStyle = Type.title)
     } else {
         Text("층", style = Type.title, color = Atd.colors.ink)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -250,5 +277,5 @@ private fun ParkingNotePicker(note: String?, knownFloors: List<String>, onSave: 
             listOf("A", "B", "C", "D", "E").forEach { z -> AtdChip("${z}구역", note?.startsWith("$floor ${z}구역") == true, { onSave("$floor ${z}구역") }) }
         }
     }
-    Text("층과 구역은 위성 위치로 알 수 없어 직접 골라요. 칸 번호는 휴대폰에서 적을 수 있어요.", style = Type.caption, color = Atd.colors.inkMuted)
+    Text("위치로는 층과 구역을 알 수 없어 직접 골라요. 칸 번호는 휴대폰에서 적어요.", style = Type.caption, color = Atd.colors.inkMuted)
 }

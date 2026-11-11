@@ -111,8 +111,9 @@ fun TripScreen(vm: TripViewModel, onSwitchMode: () -> Unit) {
 @Composable
 private fun Notices(state: TripUiState) {
     val notice = state.trip?.notice?.takeIf { !(it == TripMachine.NOTICE_ALTERNATIVE && state.replanned != null) }
-    if (notice != null) NoticeStrip(notice, if (notice == TripMachine.NOTICE_ALTERNATIVE) Tone.SUCCESS else Tone.CAUTION)
-    state.replanned?.let { NoticeStrip(it, Tone.SUCCESS) }
+    // 막힘·만차로 길이 바뀐 것은 ‘성공’이 아니라 알림이다. 초록은 사용자가 고른 조건이 반영됐을 때만 쓴다.
+    if (notice != null) NoticeStrip(notice, if (notice == TripMachine.NOTICE_ALTERNATIVE) Tone.INFO else Tone.CAUTION)
+    state.replanned?.let { NoticeStrip(it, Tone.INFO) }
 }
 
 private fun stageOf(state: TripUiState): Stage = when (state.trip?.phase) {
