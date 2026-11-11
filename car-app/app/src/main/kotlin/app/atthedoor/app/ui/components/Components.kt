@@ -354,11 +354,22 @@ fun BoxScope.SideSheet(title: String, onClose: () -> Unit, width: Dp = 760.dp, f
             }
         }
         Hairline()
-        Column(
-            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 40.dp, vertical = 28.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp),
-            content = content,
-        )
+        val scroll = rememberScrollState()
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            Column(
+                Modifier.fillMaxSize().verticalScroll(scroll).padding(horizontal = 40.dp, vertical = 28.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp),
+                content = content,
+            )
+            // 아래에 내용이 더 있으면 흐린 띠와 안내로 알려 준다.
+            if (scroll.maxValue > 0 && scroll.value < scroll.maxValue) {
+                Box(
+                    Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(72.dp)
+                        .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, c.surface))),
+                    contentAlignment = Alignment.BottomCenter,
+                ) { Text("아래에 더 있어요", style = Type.caption, color = c.inkMuted, modifier = Modifier.padding(bottom = 6.dp)) }
+            }
+        }
         if (footer != null) {
             Hairline()
             Box(Modifier.fillMaxWidth().padding(horizontal = 40.dp, vertical = 20.dp)) { footer() }

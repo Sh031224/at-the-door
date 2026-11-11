@@ -20,6 +20,10 @@ export interface CreateTripRequest {
   evidenceLabel: string;
   /** 시연 데이터 여부. 운영 데이터와 섞지 않는다 */
   demo: boolean;
+  /** 예: "주차 후 입구까지 약 80m · 계단 없음" */
+  walkSummary: string;
+  /** 차량이 같은 조건의 대안을 찾지 못한 상태(NEEDS_CHECK)면 true. 휴대폰은 시설 연락 화면으로 바뀐다 */
+  noAlternative: boolean;
   /** 대안이 없을 때 보여 줄 시설 연락처 */
   contact: string | null;
 }
@@ -67,6 +71,7 @@ export function isCreateTripRequest(v: unknown): v is CreateTripRequest {
     str("venueName") && str("planName") && str("entranceName") && str("evidenceLabel") &&
     strArr("entrancePhotos") && strArr("steps") && strArr("returnSteps") &&
     typeof o.photosAreIllustrations === "boolean" && typeof o.demo === "boolean" &&
+    str("walkSummary") && typeof o.noAlternative === "boolean" &&
     (o.parkingNote === null || str("parkingNote")) &&
     (o.contact === null || str("contact"))
   );

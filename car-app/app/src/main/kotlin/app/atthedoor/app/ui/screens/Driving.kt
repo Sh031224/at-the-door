@@ -52,7 +52,11 @@ fun DrivingScreen(state: TripUiState, onParkingFull: () -> Unit) {
     Column(Modifier.fillMaxSize().background(c.bg)) {
         state.replanned?.let { NoticeStrip(it, Tone.SUCCESS, large = true) }
         Column(Modifier.weight(1f).padding(horizontal = 48.dp, vertical = 40.dp), verticalArrangement = Arrangement.spacedBy(32.dp, Alignment.CenterVertically)) {
-            if (state.venue?.demo == true) DemoBadge(large = true)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("문앞 · 2 가는 중", style = Type.title, color = c.inkMuted)
+                Spacer(Modifier.width(20.dp))
+                if (state.venue?.demo == true) DemoBadge(large = true)
+            }
             when {
                 plan == null || phase == TripPhase.PLANNING || phase == TripPhase.CHOOSING ->
                     Text("정차한 뒤 계획을 이어서 정해요", style = Type.drive, color = c.ink)
@@ -64,18 +68,21 @@ fun DrivingScreen(state: TripUiState, onParkingFull: () -> Unit) {
                     Text("주차 위치 · ${state.trip?.parkingNote ?: "메모 없음"}", style = Type.driveSub, color = c.ink)
                 }
                 else -> {
+                    // 턴바이턴처럼 지금 향하는 곳을 가장 크게, 계획 이름은 그 아래에 둔다.
                     InverseBlock(Modifier.fillMaxWidth(), sub = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Glyph.Navigate, null, tint = c.onInverse, modifier = Modifier.size(48.dp))
-                            Spacer(Modifier.width(20.dp))
-                            Column {
-                                Text("다음 지점", style = Type.title, color = c.onInverse.copy(alpha = 0.8f))
-                                Text(shortPoint(plan.accessPoint.approach, state.venue), style = Type.drive, color = c.onInverse)
-                            }
+                        Column {
+                            Text(plan.name, style = Type.driveSub, color = c.onInverse)
+                            plan.walk.distanceM.takeIf { it.known }?.let { Text("${walkPrefix(plan)} 입구까지 약 ${it.value}m", style = Type.title, color = c.onInverse.copy(alpha = 0.85f)) }
                         }
                     }) {
-                        Text(plan.name, style = Type.hero, color = c.onInverse)
-                        plan.walk.distanceM.takeIf { it.known }?.let { Text("${walkPrefix(plan)} 입구까지 약 ${it.value}m", style = Type.driveSub, color = c.onInverse.copy(alpha = 0.85f)) }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Glyph.Navigate, null, tint = c.onInverse, modifier = Modifier.size(56.dp))
+                            Spacer(Modifier.width(24.dp))
+                            Column {
+                                Text("다음 지점", style = Type.title, color = c.onInverse.copy(alpha = 0.8f))
+                                Text(shortPoint(plan.accessPoint.approach, state.venue), style = Type.hero, color = c.onInverse)
+                            }
+                        }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(20.dp).background(if (phase == TripPhase.APPROACHING) c.success else c.caution))
@@ -98,9 +105,9 @@ fun DrivingScreen(state: TripUiState, onParkingFull: () -> Unit) {
                 "만차예요 · 다른 곳 찾기",
                 onParkingFull,
                 Modifier.fillMaxWidth(),
-                kind = ButtonKind.REPORT,
+                kind = ButtonKind.SECONDARY,
                 icon = Glyph.Warning,
-                height = Touch.drive,
+                height = Touch.segment,
                 textStyle = Type.title.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
             )
         }

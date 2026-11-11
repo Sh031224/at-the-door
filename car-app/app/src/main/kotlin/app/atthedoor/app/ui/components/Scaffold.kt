@@ -59,15 +59,24 @@ fun TopBar(venueName: String?, stage: Stage, demo: Boolean, onMore: () -> Unit, 
             Spacer(Modifier.weight(1f))
             Stage.entries.forEach { s ->
                 val active = s == stage
-                Column(Modifier.padding(horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                val done = s.ordinal < stage.ordinal
+                Row(Modifier.padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier.size(34.dp).background(if (active) c.primary else androidx.compose.ui.graphics.Color.Transparent, androidx.compose.foundation.shape.CircleShape)
+                            .border(1.5.dp, if (active) c.primary else if (done) c.inkMuted else c.inkFaint, androidx.compose.foundation.shape.CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (done) Icon(Glyph.Check, null, tint = c.inkMuted, modifier = Modifier.size(22.dp))
+                        else Text("${s.ordinal + 1}", style = Type.badge, color = if (active) c.onPrimary else c.inkFaint)
+                    }
+                    Spacer(Modifier.width(10.dp))
                     Text(
-                        "${s.ordinal + 1} ${s.label}",
+                        s.label,
                         style = if (active) Type.label.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) else Type.label,
-                        color = if (active) c.ink else if (s.ordinal < stage.ordinal) c.inkMuted else c.inkFaint,
+                        color = if (active) c.ink else if (done) c.inkMuted else c.inkFaint,
                     )
-                    Spacer(Modifier.height(8.dp))
-                    Box(Modifier.width(72.dp).height(4.dp).background(if (active) c.primary else androidx.compose.ui.graphics.Color.Transparent))
                 }
+                if (s != Stage.entries.last()) Box(Modifier.width(24.dp).height(1.5.dp).background(c.line))
             }
             Spacer(Modifier.width(28.dp))
             if (demo) DemoBadge()
@@ -87,6 +96,8 @@ data class Segment(
     val kind: SegmentKind = SegmentKind.SECONDARY,
     val icon: ImageVector? = null,
     val enabled: Boolean = true,
+    /** 진행 중 표시. 주차 중에만 쓰므로 움직임이 허용된다. */
+    val busy: Boolean = false,
 )
 
 /**
@@ -135,7 +146,10 @@ private fun SegmentCell(s: Segment, modifier: Modifier) {
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (s.icon != null) {
+        if (s.busy) {
+            androidx.compose.material3.CircularProgressIndicator(Modifier.size(32.dp), color = c.primary, strokeWidth = 4.dp)
+            Spacer(Modifier.width(16.dp))
+        } else if (s.icon != null) {
             Icon(s.icon, null, tint = fg, modifier = Modifier.size(36.dp))
             Spacer(Modifier.width(14.dp))
         }

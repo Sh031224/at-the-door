@@ -63,6 +63,13 @@ fun TripScreen(vm: TripViewModel, onSwitchMode: () -> Unit) {
                 android.content.pm.PackageManager.PERMISSION_GRANTED
             if (granted) vm.startListening() else askMic.launch(android.Manifest.permission.RECORD_AUDIO)
         },
+        openNavi = {
+            // 차량 내비 앱을 앞으로 가져온다. 경로는 이미 문앞이 보낸 상태다.
+            context.packageManager.getLaunchIntentForPackage("ai.umos.maps.android.navigation.app")?.let {
+                runCatching { context.startActivity(it.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            }
+        },
+        cue = cue,
         dial = { number ->
             // 전화 앱(차량에서는 블루투스 연결 휴대폰)을 번호가 입력된 상태로 연다. 앱이 직접 걸지 않는다.
             runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:$number")).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }

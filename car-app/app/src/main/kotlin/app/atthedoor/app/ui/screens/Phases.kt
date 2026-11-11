@@ -95,6 +95,9 @@ fun walkLabel(c: Candidate): String = buildString {
     )
 }
 
+/** 계획 이름("후문 일반 주차 구역 → 정문 경사로")에서 차를 세우는 곳만 뗀다. */
+fun spotName(c: Candidate): String = c.name.substringBefore(" → ")
+
 /** 승하차 계획이면 ‘내린 뒤’, 주차 계획이면 ‘주차 후’ */
 fun walkPrefix(c: Candidate): String = if (c.type == CandidateType.DROPOFF) "내린 뒤" else "주차 후"
 
@@ -125,7 +128,7 @@ fun PhaseBody(state: TripUiState, vm: TripViewModel, setupBlocked: Boolean, cue:
 }
 
 /** 화면 밖 동작(마이크 권한, 전화 걸기)을 하단 바에서 부를 때 쓰는 콜백 */
-class PhaseCallbacks(val speak: () -> Unit, val dial: (String) -> Unit)
+class PhaseCallbacks(val speak: () -> Unit, val dial: (String) -> Unit, val openNavi: () -> Unit, val cue: HandoffCue?)
 
 /** 단계별 하단 세그먼트. 첫 번째가 주 동작(왼쪽 절반). */
 fun phaseActions(state: TripUiState, vm: TripViewModel, cb: PhaseCallbacks, open: (Sheet) -> Unit): Pair<Segment, List<Segment>>? {
@@ -147,13 +150,19 @@ fun phaseActions(state: TripUiState, vm: TripViewModel, cb: PhaseCallbacks, open
         }
         TripPhase.NAVI_REQUESTED -> Segment(
             if (state.navi == NaviStatus.SEARCHING) "내비가 경로를 찾고 있어요 · 보통 10초" else "내비에 목적지를 보내는 중이에요",
-            {}, SegmentKind.PRIMARY, Glyph.Navigate, enabled = false,
+            {}, SegmentKind.PRIMARY, Glyph.Navigate, enabled = false, busy = true,
         ) to listOf(Segment("보내기 취소", vm::cancelNavigation))
-        TripPhase.APPROACHING -> Segment("주차했어요", { vm.confirmParking(null) }, SegmentKind.PRIMARY, Glyph.Check) to
-            listOf(Segment("만차예요 · 다른 곳 찾기", vm::reportParkingFull, SegmentKind.REPORT, Glyph.Warning), more)
+        // 도착 신호(기어 P 변화, 내비 도착) 전에는 ‘주차했어요’를 맨 앞에 두지 않는다. 출발 직후 잘못 누르지 않게 한다.
+        TripPhase.APPROACHING -> if (cb.cue != null || state.naviArrived) {
+            Segment("주차했어요", { vm.confirmParking(null) }, SegmentKind.PRIMARY, Glyph.Check) to
+                listOf(Segment("만차예요 · 다른 곳 찾기", vm::reportParkingFull, SegmentKind.REPORT, Glyph.Warning), more)
+        } else {
+            Segment("내비 화면 보기", cb.openNavi, SegmentKind.PRIMARY, Glyph.Navigate) to
+                listOf(Segment("주차했어요", { vm.confirmParking(null) }, icon = Glyph.Check), more)
+        }
         TripPhase.PARKED -> Segment("입구로 출발", vm::startWalking, SegmentKind.PRIMARY, Glyph.Walk) to buildList {
-            if (state.share is ShareState.Ready) add(Segment("이 화면으로 안내 보기", vm::skipPhone))
-            add(Segment("입구가 막혀 있어요", { vm.reportEntranceBlocked() }, SegmentKind.REPORT, Glyph.Warning))
+            if (state.share is ShareState.Ready) add(Segment("휴대폰 없이 진행", vm::skipPhone))
+            add(more)
         }
         TripPhase.WALKING -> Segment("입구에 도착했어요", vm::arrivedAtEntrance, SegmentKind.PRIMARY, Glyph.Check) to
             listOf(Segment("입구가 막혀 있어요 · 다른 입구 찾기", { vm.reportEntranceBlocked() }, SegmentKind.REPORT, Glyph.Warning))
@@ -208,9 +217,7 @@ private fun PlanningBody(state: TripUiState, vm: TripViewModel, open: (Sheet) ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("나머지 조건", style = Type.label, color = c.inkMuted)
                 Spacer(Modifier.width(24.dp))
-                FlowRow(Modifier.weight(1f).clickable { open(Sheet.CONDITIONS) }, horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    summaryChips(d, state.arrival.label).forEach { AtdChip(it, selected = false, onClick = null) }
-                }
+                Text(summaryChips(d, state.arrival.label).joinToString("  ·  "), Modifier.weight(1f).clickable { open(Sheet.CONDITIONS) }, style = Type.bodyStrong, color = c.ink)
                 AtdButton("바꾸기", { open(Sheet.CONDITIONS) }, kind = ButtonKind.QUIET, trailing = Glyph.Chevron, height = 88.dp)
             }
             Hairline()
@@ -225,7 +232,7 @@ private fun summaryChips(d: TravelConditions, arrival: String): List<String> = b
     add(if (d.preferShortWalk) Labels.SHORT_WALK else "거리 상관없음")
     add(if (d.mobilityAid == app.atthedoor.domain.model.MobilityAid.NONE) "보조기구 없음" else d.mobilityAid.label)
     if (d.hasDisabledParkingPermit) add(Labels.PERMIT)
-    add("도착 $arrival")
+    add("$arrival 도착")
 }
 
 /** 조건을 바꿀 때마다 다시 계산한 결과를 한 줄로. 같은 결정을 두 번 묻지 않도록 카드가 아닌 줄로 둔다. */
@@ -290,9 +297,10 @@ private fun ChoosingBody(state: TripUiState, vm: TripViewModel, open: (Sheet) ->
             ) {
                 Icon(Glyph.Info, null, tint = c.primary, modifier = Modifier.size(36.dp))
                 Spacer(Modifier.width(18.dp))
-                val gain = hint.candidate.walk.distanceM.takeIf { it.known }?.let { " (입구까지 약 ${it.value}m)" }.orEmpty()
-                Text("${hint.verdict.hint!!.label}: ${hint.candidate.name}$gain", Modifier.weight(1f), style = Type.bodyStrong, color = c.ink)
-                AtdButton("이렇게 바꾸기", { vm.applyHint(hint.verdict.hint!!) }, kind = ButtonKind.SECONDARY, height = 88.dp)
+                val gain = hint.candidate.walk.distanceM.takeIf { it.known }?.let { "(입구까지 약 ${it.value}m)" }.orEmpty()
+                val who = if (hint.verdict.hint == app.atthedoor.domain.plan.ConditionHint.ADD_OTHER_GUARDIAN) "다른 보호자가 함께라면" else "장애인 주차 표지가 있다면"
+                Text("$who ${hint.candidate.name}$gain${"도"} 쓸 수 있어요", Modifier.weight(1f), style = Type.bodyStrong, color = c.ink)
+                AtdButton("조건 바꿔 보기", { vm.applyHint(hint.verdict.hint!!) }, kind = ButtonKind.SECONDARY, height = 88.dp)
             }
         }
     }
@@ -350,11 +358,11 @@ private fun ApproachBody(state: TripUiState, cue: HandoffCue?) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(14.dp).background(if (cue != null) c.inkFaint else c.success))
                     Spacer(Modifier.width(14.dp))
-                    Text(if (cue != null) "도착 지점 근처예요" else "내비게이션 안내 중", style = Type.title, color = c.onInverse)
+                    Text(if (cue != null) "목적지 근처예요" else "내비게이션 안내 중", style = Type.title, color = c.onInverse)
                 }
             }) {
-                Text("다음 지점", style = Type.title, color = c.onInverse.copy(alpha = 0.8f))
-                Text(point, style = Type.headline, color = c.onInverse)
+                Text(if (cue != null) "세우는 곳" else "다음 지점", style = Type.title, color = c.onInverse.copy(alpha = 0.8f))
+                Text(if (cue != null) spotName(plan) else point, style = Type.headline, color = c.onInverse)
             }
             Panel(Modifier.weight(1f)) {
                 Text("${walkPrefix(plan)} 이렇게 가요", style = Type.label, color = c.inkMuted)
@@ -463,7 +471,7 @@ private fun VisitBody(state: TripUiState, open: (Sheet) -> Unit) {
         Headline("입구 도착을 확인했어요. 좋은 시간 보내세요", sub = "문앞 안내는 건물 입구까지예요. 방문 중에는 알림을 띄우지 않아요.")
         Panel(Modifier.fillMaxWidth(), padding = 40.dp, spacing = 0.dp) {
             Text("주차한 곳", style = Type.label, color = c.inkMuted)
-            Text(state.selected?.name ?: "", style = Type.headline, color = c.ink)
+            Text(state.selected?.let(::spotName) ?: "", style = Type.headline, color = c.ink)
             if (note != null) Text(note, style = Type.hero, color = c.ink, modifier = Modifier.padding(top = 8.dp))
             Spacer(Modifier.height(24.dp))
             Hairline()
@@ -471,7 +479,7 @@ private fun VisitBody(state: TripUiState, open: (Sheet) -> Unit) {
                 ListRow("층과 구역 남기기", subtitle = "돌아올 때 찾기 쉬워요", leading = { Icon(Glyph.Parking, null, Modifier.size(40.dp), tint = c.ink) }, onClick = { open(Sheet.PARKING_NOTE) })
                 Hairline()
             }
-            ListRow("돌아갈 때 나갈 문", subtitle = state.selectedEntrance?.name ?: "입구", leading = { Icon(Glyph.Door, null, Modifier.size(40.dp), tint = c.ink) })
+            ListRow("이용한 입구 · 돌아갈 때 나갈 문", subtitle = state.selectedEntrance?.name ?: "입구", leading = { Icon(Glyph.Door, null, Modifier.size(40.dp), tint = c.ink) })
         }
     }
 }
@@ -488,7 +496,7 @@ private fun ReturnBody(state: TripUiState) {
             Headline("차로 돌아가는 길", Modifier.weight(1f), sub = "올 때 지나온 길이라도 지금 열려 있는지는 현장에서 확인해 주세요")
             Column(horizontalAlignment = Alignment.End) {
                 Text("주차한 곳", style = Type.caption, color = c.inkMuted)
-                Text(listOfNotNull(plan.name, state.trip?.parkingNote).joinToString(" · "), style = Type.title, color = c.ink)
+                Text(listOfNotNull(spotName(plan), state.trip?.parkingNote).joinToString(" · "), style = Type.title, color = c.ink)
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(Gap)) {

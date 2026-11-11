@@ -94,6 +94,10 @@ data class TripSnapshot(
     val demo: Boolean,
     /** 대안이 없을 때 보여 줄 시설 연락처 */
     val contact: String?,
+    /** 예: "주차 후 입구까지 약 80m · 계단 없음" */
+    val walkSummary: String,
+    /** 같은 조건의 대안을 찾지 못함. 휴대폰은 시설 연락 화면으로 바뀐다. */
+    val noAlternative: Boolean,
 )
 
 data class ShareLink(val token: String, val url: String, val expiresAtEpochMs: Long)

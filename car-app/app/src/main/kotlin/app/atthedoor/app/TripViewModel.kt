@@ -83,6 +83,8 @@ data class TripUiState(
     val replanned: String? = null,
     /** 완료 화면에서 고르는 중인 제보. 하단 버튼 문구가 이 값을 따른다. */
     val feedbackDraft: Set<FeedbackKind> = emptySet(),
+    /** 내비가 목적 지점 도착을 알림(onDestinationArrived). 사람의 도착이 아니라 ‘주차했어요’를 앞에 둘 시점의 참고 신호다. */
+    val naviArrived: Boolean = false,
 ) {
     val selected: Candidate? get() = trip?.selectedCandidateId?.let { venue?.candidate(it) }
     val selectedEntrance: Entrance? get() = selected?.let { venue?.entrance(it.walk.toEntranceId) }
@@ -269,7 +271,7 @@ class TripViewModel(private val c: AppContainer) : ViewModel() {
 
     private fun requestNavigation(candidate: Candidate) {
         naviJob?.cancel()
-        _state.update { it.copy(navi = NaviStatus.SENDING) }
+        _state.update { it.copy(navi = NaviStatus.SENDING, naviArrived = false) }
         naviJob = viewModelScope.launch {
             var guiding = false
             var arrived = false
@@ -283,7 +285,10 @@ class TripViewModel(private val c: AppContainer) : ViewModel() {
                     }
                     is NaviResult.Failed -> if (!guiding) failNavi("경로 안내를 시작하지 못했어요. 다시 안내를 눌러 주세요. (${r.code})")
                     NaviResult.TimedOut -> if (!guiding) failNavi("내비게이션 응답이 없어요. 계획은 그대로 두었어요.")
-                    NaviResult.Arrived -> arrived = true
+                    NaviResult.Arrived -> {
+                        arrived = true
+                        _state.update { it.copy(naviArrived = true) }
+                    }
                     NaviResult.Cancelled, NaviResult.Ended -> if (guiding && !arrived) {
                         _state.update { it.copy(navi = NaviStatus.IDLE) }
                         dispatch(TripEvent.NaviInterrupted("내비 안내가 중간에 끝났어요. 같은 계획으로 다시 안내할까요?"))
@@ -350,6 +355,7 @@ class TripViewModel(private val c: AppContainer) : ViewModel() {
                 replannedJob?.cancel()
                 _state.update { it.copy(replanned = null) }
                 c.voice.speak("확인된 대안이 없어요. 시설에 문의해 주세요.")
+                pushShareUpdate()
             }
             TripPhase.CHOOSING -> {
                 naviJob?.cancel()
@@ -428,6 +434,17 @@ class TripViewModel(private val c: AppContainer) : ViewModel() {
         reevaluate()
     }
 
+    private fun walkSummary(c: Candidate): String {
+        val prefix = if (c.type == app.atthedoor.domain.model.CandidateType.DROPOFF) "내린 뒤" else "주차 후"
+        val dist = if (c.walk.distanceM.known) "약 ${c.walk.distanceM.value}m" else "거리 확인 필요"
+        val stairs = when {
+            !c.walk.stairs.known -> "계단 여부 확인 필요"
+            c.walk.stairs.value == true -> "계단 있음"
+            else -> "계단 없음"
+        }
+        return "$prefix 입구까지 $dist · $stairs"
+    }
+
     private fun createShareLink() {
         val snapshot = snapshot() ?: return
         _state.update { it.copy(share = ShareState.Creating) }
@@ -461,6 +478,8 @@ class TripViewModel(private val c: AppContainer) : ViewModel() {
             evidenceLabel = (candidate.walk.stairs.evidence ?: candidate.walk.distanceM.evidence)?.label ?: "확인 정보 없음",
             demo = venue.demo,
             contact = venue.contact,
+            walkSummary = walkSummary(candidate),
+            noAlternative = s.trip?.phase == TripPhase.NEEDS_CHECK,
         )
     }
 

@@ -89,7 +89,7 @@ fun BoxScope.Sheets(sheet: Sheet, state: TripUiState, vm: TripViewModel, onClose
                 ConditionsEditor(draft) { draft = it }
             }
         }
-        Sheet.OTHER_PLANS -> SideSheet("다른 계획", onClose, width = 880.dp) {
+        Sheet.OTHER_PLANS -> SideSheet("다른 계획", onClose) {
             var showExcluded by remember { mutableStateOf(false) }
             val results = state.evaluation?.results.orEmpty()
             val focusId = focusOf(state)?.candidate?.id
@@ -119,7 +119,7 @@ fun BoxScope.Sheets(sheet: Sheet, state: TripUiState, vm: TripViewModel, onClose
         }
         Sheet.EVIDENCE -> {
             val r = focusOf(state)
-            SideSheet("왜 이 계획인가요", onClose, width = 880.dp) {
+            SideSheet("왜 이 계획인가요", onClose) {
                 if (r == null) return@SideSheet
                 val entrance = state.venue?.entrance(r.candidate.walk.toEntranceId)
                 Text(r.candidate.name, style = Type.headline, color = Atd.colors.ink)
@@ -143,6 +143,14 @@ fun BoxScope.Sheets(sheet: Sheet, state: TripUiState, vm: TripViewModel, onClose
             val phase = state.trip?.phase
             if (phase == TripPhase.APPROACHING) {
                 ListRow("내비 다시 안내", subtitle = "같은 계획으로 다시 보내요", leading = { Icon(Glyph.Refresh, null, Modifier.size(40.dp)) }, onClick = { vm.retryNavigationFromApproach(); onClose() })
+                Hairline()
+            }
+            if (phase == TripPhase.APPROACHING && !state.naviArrived) {
+                ListRow("만차예요 · 다른 곳 찾기", subtitle = "같은 조건의 다른 주차 구역으로 다시 안내해요", leading = { Icon(Glyph.Warning, null, Modifier.size(40.dp), tint = Atd.colors.report) }, onClick = { vm.reportParkingFull(); onClose() })
+                Hairline()
+            }
+            if (phase == TripPhase.PARKED) {
+                ListRow("입구가 막혀 있어요", subtitle = "같은 주차장에서 갈 수 있는 다른 입구를 먼저 찾아요", leading = { Icon(Glyph.Warning, null, Modifier.size(40.dp), tint = Atd.colors.report) }, onClick = { vm.reportEntranceBlocked(); onClose() })
                 Hairline()
             }
             if (phase in setOf(TripPhase.APPROACHING, TripPhase.PARKED, TripPhase.WALKING, TripPhase.RETURNING, TripPhase.NEEDS_CHECK)) {
@@ -184,7 +192,7 @@ private fun statusLabel(s: VerificationStatus) = when (s) {
 private fun SheetPreview(state: TripUiState) {
     val rec = state.evaluation?.recommended
     Text(
-        rec?.let { "이 조건이면 · 추천 ${it.candidate.name} (${walkPrefix(it.candidate)} ${walkLabel(it.candidate)})" } ?: "이 조건이면 · 확인된 계획이 아직 없어요",
+        rec?.let { "이 조건이면 추천 · ${it.candidate.name}\n${walkPrefix(it.candidate)} 입구까지 ${walkLabel(it.candidate)}" } ?: "이 조건이면 · 확인된 계획이 아직 없어요",
         style = Type.bodyStrong,
         color = if (rec != null) Atd.colors.ink else Atd.colors.caution,
     )

@@ -16,6 +16,8 @@ const snapshot: CreateTripRequest = {
   evidenceLabel: "데모 현장 조사 · 2026-11-01",
   demo: true,
   contact: "02-000-0000",
+  walkSummary: "주차 후 입구까지 약 80m · 계단 없음",
+  noAlternative: false,
 };
 
 function setup(now = () => 1_000) {
@@ -136,4 +138,13 @@ test("입구 도착을 되돌리면 다시 입구 안내가 보인다", async ()
   await app.request(`/api/trips/${token}/events`, json({ type: "arrival_undone" }));
   const html = await (await app.request(`/t/${token}`)).text();
   assert.ok(html.includes("후문까지 함께 가요"));
+});
+
+test("차량이 대안을 찾지 못하면 휴대폰은 시설 연락 화면으로 바뀐다", async () => {
+  const { app, json } = setup();
+  const { token } = (await (await app.request("/api/trips", json(snapshot))).json()) as CreateTripResponse;
+  await app.request(`/api/trips/${token}`, { ...json({ ...snapshot, noAlternative: true }), method: "PUT" });
+  const html = await (await app.request(`/t/${token}`)).text();
+  assert.ok(html.includes("확인된 다른 입구가 없어요"));
+  assert.ok(html.includes("tel:02-000-0000"));
 });

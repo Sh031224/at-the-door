@@ -30,6 +30,28 @@ export const GuidePage: FC<{ trip: StoredTrip; events: PhoneEvent[] }> = ({ trip
   const stage = stageOf(events);
   const hasReturnSteps = s.returnSteps.length > 0;
   const steps = stage === "return" ? (hasReturnSteps ? s.returnSteps : [...s.steps].reverse()) : s.steps;
+  // 계획 이름("후문 일반 주차 구역 → 정문 경사로")에서 차를 세운 곳만 뗀다.
+  const spot = s.planName.split(" → ")[0];
+  const noteForm = (
+    <details class="row">
+      <summary>
+        <span>주차 위치</span>
+        <b id="parking-note">{s.parkingNote ?? "지금 남기기"}</b>
+      </summary>
+      <form data-type="parking_note">
+        <input name="note" maxlength={40} placeholder="예: 지하 2층 B-14" aria-label="주차 위치 메모" />
+        <button type="submit">저장</button>
+      </form>
+    </details>
+  );
+  const spotCard = (
+    <section class="spot">
+      <p class="label">주차한 곳</p>
+      <p class="mid">{spot}</p>
+      {s.parkingNote ? <p class="big">{s.parkingNote}</p> : <p class="label">층과 구역을 남기지 않았어요</p>}
+      <p class="label">이용한 입구 · {s.entranceName}</p>
+    </section>
+  );
   return (
     <html lang="ko">
       <head>
@@ -46,27 +68,26 @@ export const GuidePage: FC<{ trip: StoredTrip; events: PhoneEvent[] }> = ({ trip
           {s.demo && <span class="badge">시연 데이터</span>}
         </header>
         <main data-stage={stage}>
-          {stage === "visit" ? (
+          {s.noAlternative ? (
+            <>
+              <h1>확인된 다른 입구가 없어요</h1>
+              <p class="sub">같은 조건으로 갈 수 있는 길을 찾지 못했어요. 없는 길을 만들어 안내하지 않아요.</p>
+              {spotCard}
+              {s.contact && <p class="sub">시설 연락처 · {s.contact}{s.demo && " (시연용 번호)"}</p>}
+            </>
+          ) : stage === "visit" ? (
             <>
               <h1>입구 도착을 확인했어요</h1>
               <p class="sub">좋은 시간 보내세요. 돌아갈 때 아래 버튼을 눌러 주세요.</p>
-              <section class="spot">
-                <p class="label">주차 위치</p>
-                <p class="big">{s.parkingNote ?? "메모 없음"}</p>
-                <p class="label">나갈 문 · {s.entranceName}</p>
-              </section>
+              {spotCard}
+              {!s.parkingNote && noteForm}
             </>
           ) : (
             <>
               <h1>{stage === "return" ? "차로 돌아가는 길" : `${s.entranceName}까지 함께 가요`}</h1>
-              <p class="sub">{s.planName}</p>
+              <p class="sub">{stage === "return" ? `${spot}으로 돌아가요` : s.walkSummary}</p>
 
-              {stage === "return" && (
-                <section class="spot">
-                  <p class="label">주차 위치</p>
-                  <p class="big">{s.parkingNote ?? "메모 없음"}</p>
-                </section>
-              )}
+              {stage === "return" && spotCard}
 
               <h2>{stage === "return" ? (hasReturnSteps ? "돌아가는 순서" : "올 때 지나온 길 (거꾸로 따라가세요)") : "이동 순서"}</h2>
               <ol class="steps">{steps.map((step) => <li>{step}</li>)}</ol>
@@ -79,36 +100,33 @@ export const GuidePage: FC<{ trip: StoredTrip; events: PhoneEvent[] }> = ({ trip
                 </figure>
               )}
 
-              {stage === "guide" && (
-                <details class="row">
-                  <summary>
-                    <span>주차 위치</span>
-                    <b id="parking-note">{s.parkingNote ?? "남기기"}</b>
-                  </summary>
-                  <form data-type="parking_note">
-                    <input name="note" maxlength={40} placeholder="예: 지하 2층 B-14" aria-label="주차 위치 메모" />
-                    <button type="submit">저장</button>
-                  </form>
-                </details>
-              )}
+              {stage === "guide" && noteForm}
 
-              <button data-type="entrance_blocked" class="report">{stage === "return" ? "길이 막혀 있어요 · 다른 길 찾기" : "입구가 막혀 있어요 · 다른 입구 찾기"}</button>
+              <details class="confirm">
+                <summary class="report">{stage === "return" ? "길이 막혀 있어요 · 다른 길 찾기" : "입구가 막혀 있어요 · 다른 입구 찾기"}</summary>
+                <p>차량 앱이 같은 조건으로 {stage === "return" ? "다른 길을" : "다른 입구를"} 찾을까요?</p>
+                <div class="confirm-row">
+                  <button data-type="entrance_blocked" class="report-go">찾기</button>
+                  <button type="button" data-close>취소</button>
+                </div>
+              </details>
             </>
           )}
           <p id="status" role="status" aria-live="polite"></p>
 
           <details class="info">
-            <summary>정보 출처와 안내</summary>
+            <summary>정보 출처와 안내 ▾</summary>
             <p>정보 출처: {s.evidenceLabel}</p>
             <p>실제 통행 가능 여부는 현장에서 확인해 주세요. 이 링크는 24시간 뒤 사라져요. 이름·건강 정보·이동 조건·GPS 위치는 담지 않고, 직접 남긴 주차 메모만 담아요.</p>
             {s.contact && <p>막혀 있고 대안이 없으면 시설에 문의해 주세요: <a href={`tel:${s.contact}`}>{s.contact}</a>{s.demo && " (시연용 번호)"}</p>}
           </details>
         </main>
         <nav class="bar">
-          {stage === "guide" && <button data-type="arrived" class="primary">입구에 도착했어요</button>}
-          {stage === "visit" && <button data-type="returning" class="primary">차로 돌아가기</button>}
+          {s.noAlternative && s.contact && <a class="primary" href={`tel:${s.contact}`}>시설에 전화</a>}
+          {!s.noAlternative && stage === "guide" && <button data-type="arrived" class="primary">입구에 도착했어요</button>}
+          {!s.noAlternative && stage === "visit" && <button data-type="returning" class="primary">차로 돌아가기</button>}
           {stage === "visit" && <button data-type="arrival_undone" class="quiet">아직 도착하지 않았어요</button>}
-          {stage === "return" && <p class="hint">차에 타면 차량 화면에서 ‘차에 탔어요’를 눌러 마무리해요</p>}
+          {!s.noAlternative && stage === "return" && <p class="hint">차에 타면 차량 화면에서 ‘차에 탔어요’를 눌러 마무리해요</p>}
         </nav>
         <script dangerouslySetInnerHTML={{ __html: script(trip.token, trip.version) }} />
       </body>
@@ -150,7 +168,7 @@ async function send(type, note) {
   } catch { status.textContent = "연결이 끊겼어요. 화면의 사진과 순서를 참고해 주세요."; }
 }
 async function waitForNewPlan() {
-  for (let i = 0; i < 24; i++) {
+  for (let i = 0; i < 6; i++) {
     await new Promise((r) => setTimeout(r, 5000));
     try {
       const res = await fetch("/api/trips/${token}/plan", { cache: "no-store" });
@@ -159,9 +177,11 @@ async function waitForNewPlan() {
       if (body.version !== version) { location.reload(); return; }
     } catch {}
   }
-  status.textContent = "새 안내를 받지 못했어요. 차량 화면을 확인하거나 시설에 문의해 주세요.";
+  status.textContent = "아직 새 안내가 없어요. 차량 화면을 확인하거나 시설에 문의해 주세요.";
+  location.reload();
 }
 document.querySelectorAll("button[data-type]").forEach((b) => b.addEventListener("click", () => send(b.dataset.type)));
+document.querySelectorAll("button[data-close]").forEach((b) => b.addEventListener("click", () => b.closest("details").removeAttribute("open")));
 const form = document.querySelector("form[data-type]");
 if (form) form.addEventListener("submit", (e) => {
   e.preventDefault();
@@ -189,7 +209,7 @@ h1 { font-size: 28px; line-height: 1.3; margin: 0 0 4px; } h2 { font-size: 15px;
 .photo { margin: 16px 0 0; position: relative; } .photo .illust { position: absolute; left: 8px; top: 34px; background: var(--demo-bg); color: var(--demo-fg); font-size: 13px; font-weight: 700; padding: 2px 8px; border-radius: 2px; } .photo figcaption { font-size: 15px; color: var(--muted); margin-bottom: 6px; }
 .photo img { width: 100%; display:block; border: 1px solid var(--line); }
 .spot { background: var(--surface); border: 1px solid var(--line); padding: 20px 16px; margin-top: 16px; }
-.label { margin: 0; color: var(--muted); font-size: 15px; } .big { font-size: 40px; font-weight: 700; margin: 4px 0 8px; line-height: 1.2; }
+.label { margin: 0; color: var(--muted); font-size: 15px; } .big { font-size: 40px; font-weight: 700; margin: 4px 0 8px; line-height: 1.2; } .mid { font-size: 22px; font-weight: 700; margin: 2px 0 6px; }
 details.row { margin-top: 16px; background: var(--surface); border: 1px solid var(--line); }
 details.row summary { list-style: none; display:flex; justify-content: space-between; align-items:center; padding: 0 16px; min-height: 56px; cursor: pointer; }
 details.row summary b { color: var(--primary); }
@@ -197,10 +217,13 @@ details.row form { display:flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 16px
 details.row input { flex: 1; min-width: 0; font-size: 17px; padding: 12px; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: var(--fg); }
 details.row form button { flex: 0 0 auto; }
 button { font: inherit; font-size: 17px; padding: 0 16px; min-height: 48px; border-radius: 4px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); }
-button.report { margin-top: 16px; width: 100%; background: transparent; border: 0; color: var(--report); font-weight: 600; text-align: left; padding: 0; }
+details.confirm { margin-top: 16px; } details.confirm summary { list-style: none; }
+.report { display:flex; align-items:center; justify-content:center; min-height: 56px; border: 1px solid var(--report); border-radius: 4px; color: var(--report); font-weight: 600; cursor: pointer; }
+details.confirm p { margin: 12px 0 8px; } .confirm-row { display:flex; gap: 8px; } .confirm-row button { flex: 1; min-height: 56px; } .report-go { background: var(--report); color: #fff; border: 0; font-weight: 700; }
 details.info { margin-top: 32px; color: var(--muted); font-size: 14px; } details.info summary { min-height: 44px; display:flex; align-items:center; }
 .bar { position: fixed; left:0; right:0; bottom:0; display:flex; flex-direction: column; gap: 4px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: var(--surface); border-top: 1px solid var(--line); }
-.bar button.primary { min-height: 60px; font-size: 19px; font-weight: 700; background: var(--primary); color: var(--on-primary); border: 0; width: 100%; }
+.bar .primary { display:flex; align-items:center; justify-content:center; text-decoration: none; border-radius: 4px; }
+.bar button.primary, .bar a.primary { min-height: 60px; font-size: 19px; font-weight: 700; background: var(--primary); color: var(--on-primary); border: 0; width: 100%; }
 .bar button.quiet { border: 0; background: transparent; color: var(--primary); }
 .bar .hint { margin: 0; text-align: center; color: var(--muted); font-size: 15px; padding: 8px 0; }
 #status { min-height: 1.5em; font-weight: 600; margin: 12px 0 0; }
