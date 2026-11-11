@@ -40,31 +40,30 @@ export const GuidePage: FC<{ trip: StoredTrip; events: PhoneEvent[] }> = ({ trip
         <style>{css}</style>
       </head>
       <body>
+        <header class="top">
+          <strong>문앞</strong>
+          <span class="venue">{s.venueName}</span>
+          {s.demo && <span class="badge">시연 데이터</span>}
+        </header>
         <main data-stage={stage}>
-          {s.demo && <p class="demo">시연 데이터 · 실제 시설 검증 결과가 아니에요</p>}
-          <p class="venue">{s.venueName}</p>
-
           {stage === "visit" ? (
             <>
               <h1>입구 도착을 확인했어요</h1>
-              <p class="lead">좋은 시간 보내세요. 돌아갈 때 아래 버튼을 눌러 주세요.</p>
-              <section class="note">
-                <h2>주차 위치</h2>
+              <p class="sub">좋은 시간 보내세요. 돌아갈 때 아래 버튼을 눌러 주세요.</p>
+              <section class="spot">
+                <p class="label">주차 위치</p>
                 <p class="big">{s.parkingNote ?? "메모 없음"}</p>
-              </section>
-              <section class="actions">
-                <button data-type="returning" class="primary">차로 돌아가기</button>
-                <button data-type="arrival_undone">아직 도착하지 않았어요 (안내로 돌아가기)</button>
+                <p class="label">나갈 문 · {s.entranceName}</p>
               </section>
             </>
           ) : (
             <>
               <h1>{stage === "return" ? "차로 돌아가는 길" : `${s.entranceName}까지 함께 가요`}</h1>
-              <p class="plan">{s.planName}</p>
+              <p class="sub">{s.planName}</p>
 
               {stage === "return" && (
-                <section class="note">
-                  <h2>주차 위치</h2>
+                <section class="spot">
+                  <p class="label">주차 위치</p>
                   <p class="big">{s.parkingNote ?? "메모 없음"}</p>
                 </section>
               )}
@@ -73,39 +72,43 @@ export const GuidePage: FC<{ trip: StoredTrip; events: PhoneEvent[] }> = ({ trip
               <ol class="steps">{steps.map((step) => <li>{step}</li>)}</ol>
 
               {s.entrancePhotos.length > 0 && (
-                <section class="photos">
-                  <h2>{stage === "return" ? "나갈 문" : "도착할 입구"}: {s.entranceName}</h2>
-                  {s.entrancePhotos.map((p) => (
-                    <img src={`/photos/${p}`} alt={s.photosAreIllustrations ? `${s.entranceName} 시연용 일러스트(실제 사진 아님)` : `${s.entranceName} 사진`} loading="lazy" />
-                  ))}
-                </section>
+                <figure class="photo">
+                  <figcaption>{stage === "return" ? "나갈 문" : "도착할 입구"} · {s.entranceName}</figcaption>
+                  <img src={`/photos/${s.entrancePhotos[0]}`} alt={s.photosAreIllustrations ? `${s.entranceName} 시연용 일러스트(실제 사진 아님)` : `${s.entranceName} 사진`} loading="lazy" />
+                </figure>
               )}
 
               {stage === "guide" && (
-                <section class="note">
-                  <h2>주차 위치 메모</h2>
-                  <p id="parking-note">{s.parkingNote ?? "아직 메모가 없어요"}</p>
+                <details class="row">
+                  <summary>
+                    <span>주차 위치</span>
+                    <b id="parking-note">{s.parkingNote ?? "남기기"}</b>
+                  </summary>
                   <form data-type="parking_note">
                     <input name="note" maxlength={40} placeholder="예: 지하 2층 B-14" aria-label="주차 위치 메모" />
                     <button type="submit">저장</button>
                   </form>
-                </section>
+                </details>
               )}
 
-              <section class="actions">
-                {stage === "guide" && <button data-type="arrived" class="primary">입구에 도착했어요</button>}
-                <button data-type="entrance_blocked">{stage === "return" ? "길이 막혀 있어요 · 다른 길 찾기" : "입구가 막혀 있어요 · 다른 입구 찾기"}</button>
-              </section>
+              <button data-type="entrance_blocked" class="report">{stage === "return" ? "길이 막혀 있어요 · 다른 길 찾기" : "입구가 막혀 있어요 · 다른 입구 찾기"}</button>
             </>
           )}
           <p id="status" role="status" aria-live="polite"></p>
 
-          <footer>
+          <details class="info">
+            <summary>정보 출처와 안내</summary>
             <p>정보 출처: {s.evidenceLabel}</p>
             <p>실제 통행 가능 여부는 현장에서 확인해 주세요. 이 링크는 24시간 뒤 사라져요. 이름·건강 정보·이동 조건·GPS 위치는 담지 않고, 직접 남긴 주차 메모만 담아요.</p>
             {s.contact && <p>막혀 있고 대안이 없으면 시설에 문의해 주세요: <a href={`tel:${s.contact}`}>{s.contact}</a>{s.demo && " (시연용 번호)"}</p>}
-          </footer>
+          </details>
         </main>
+        <nav class="bar">
+          {stage === "guide" && <button data-type="arrived" class="primary">입구에 도착했어요</button>}
+          {stage === "visit" && <button data-type="returning" class="primary">차로 돌아가기</button>}
+          {stage === "visit" && <button data-type="arrival_undone" class="quiet">아직 도착하지 않았어요</button>}
+          {stage === "return" && <p class="hint">차에 타면 차량 화면에서 ‘차에 탔어요’를 눌러 마무리해요</p>}
+        </nav>
         <script dangerouslySetInnerHTML={{ __html: script(trip.token, trip.version) }} />
       </body>
     </html>
@@ -167,26 +170,38 @@ if (form) form.addEventListener("submit", (e) => {
 `;
 
 const css = `
-:root { color-scheme: light dark; --fg:#15181d; --bg:#fff; --muted:#5b6370; --accent:#1b4fa0; --line:#d6dae0; --warn-bg:#fcebd2; --warn-fg:#4a2b00; --on-accent:#fff; }
-@media (prefers-color-scheme: dark) { :root { --fg:#f2f2f2; --bg:#111418; --muted:#aab2bd; --accent:#8db4f5; --on-accent:#0d2a57; --line:#333a44; --warn-bg:#4a2b00; --warn-fg:#fcebd2; } }
+:root { color-scheme: light dark; --bg:#F0F0F0; --surface:#FFFFFF; --line:#D6D6D6; --fg:#111111; --muted:#555555; --primary:#002C5F; --on-primary:#FFFFFF; --report:#A84300; --demo-bg:#FFE9A8; --demo-fg:#6B4E00; }
+@media (prefers-color-scheme: dark) { :root { --bg:#0B0B0C; --surface:#161718; --line:#34363A; --fg:#F2F2F2; --muted:#A9ABAF; --primary:#2D6CB5; --on-primary:#FFFFFF; --report:#FF9A5C; --demo-bg:#3A3010; --demo-fg:#FFE08A; } }
 * { box-sizing: border-box; }
-body { margin:0; font: 18px/1.6 system-ui, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; color:var(--fg); background:var(--bg); }
-main { max-width: 560px; margin: 0 auto; padding: 20px 16px 48px; word-break: keep-all; overflow-wrap: anywhere; }
-img { max-width: 100%; }
-h1 { font-size: 1.6rem; line-height: 1.3; margin: 4px 0 8px; } h2 { font-size: 1.1rem; margin: 20px 0 6px; }
-.demo { background: var(--warn-bg); color: var(--warn-fg); border-radius: 10px; padding: 8px 12px; font-size: .9rem; margin: 0 0 8px; }
-.venue, .plan, .lead, footer { color: var(--muted); } footer { font-size: .85rem; margin-top: 32px; }
-.chips { display:flex; flex-wrap:wrap; gap:6px; padding:0; list-style:none; }
-.chips li { border:1px solid var(--line); border-radius: 999px; padding: 2px 10px; font-size:.9rem; }
-.photos img { width:100%; border-radius: 12px; display:block; margin: 8px 0; }
-.steps { padding-left: 1.4em; } .steps li { margin: 10px 0; font-size: 1.15rem; }
-.note { border-top:1px solid var(--line); padding-top: 4px; margin-top: 16px; }
-.big { font-size: 1.5rem; font-weight: 700; margin: 4px 0; }
 html, body { overflow-x: hidden; }
-.note form { display:flex; flex-wrap: wrap; gap:8px; } .note form button { flex: 0 0 auto; } .note input { flex:1; min-width:0; font-size:1rem; padding:12px; border-radius: 10px; border:1px solid var(--line); background: transparent; color: var(--fg); }
-.actions { display:grid; gap:10px; margin-top: 24px; }
-button { font-size: 1.05rem; padding: 16px; border-radius: 12px; border:1px solid var(--line); background: transparent; color: var(--fg); min-height: 56px; }
-button.primary { background: var(--accent); color: var(--on-accent); border: none; font-weight: 700; }
-#status { min-height: 1.6em; font-weight: 600; }
-a { color: var(--accent); }
+body { margin:0; font: 18px/1.55 system-ui, -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; color:var(--fg); background:var(--bg); font-variant-numeric: tabular-nums; }
+.top { position: sticky; top:0; z-index:2; display:flex; align-items:center; gap:8px; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--line); font-size: 15px; }
+.top .venue { color: var(--muted); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.badge { background: var(--demo-bg); color: var(--demo-fg); padding: 2px 8px; border-radius: 2px; font-size: 13px; font-weight: 700; }
+main { max-width: 560px; margin: 0 auto; padding: 20px 16px 120px; word-break: keep-all; overflow-wrap: anywhere; }
+h1 { font-size: 28px; line-height: 1.3; margin: 0 0 4px; } h2 { font-size: 15px; color: var(--muted); margin: 24px 0 4px; font-weight: 600; }
+.sub { color: var(--muted); margin: 0; }
+.steps { list-style: none; counter-reset: s; padding: 0; margin: 0; background: var(--surface); border: 1px solid var(--line); }
+.steps li { counter-increment: s; display:flex; gap: 12px; padding: 14px 16px; font-size: 20px; border-bottom: 1px solid var(--line); min-height: 56px; }
+.steps li:last-child { border-bottom: 0; }
+.steps li::before { content: counter(s); flex: 0 0 28px; height: 28px; border: 2px solid var(--primary); color: var(--primary); border-radius: 50%; font-size: 15px; font-weight: 700; display:flex; align-items:center; justify-content:center; margin-top: 2px; }
+.photo { margin: 16px 0 0; } .photo figcaption { font-size: 15px; color: var(--muted); margin-bottom: 6px; }
+.photo img { width: 100%; display:block; border: 1px solid var(--line); }
+.spot { background: var(--surface); border: 1px solid var(--line); padding: 20px 16px; margin-top: 16px; }
+.label { margin: 0; color: var(--muted); font-size: 15px; } .big { font-size: 40px; font-weight: 700; margin: 4px 0 8px; line-height: 1.2; }
+details.row { margin-top: 16px; background: var(--surface); border: 1px solid var(--line); }
+details.row summary { list-style: none; display:flex; justify-content: space-between; align-items:center; padding: 0 16px; min-height: 56px; cursor: pointer; }
+details.row summary b { color: var(--primary); }
+details.row form { display:flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 16px; }
+details.row input { flex: 1; min-width: 0; font-size: 17px; padding: 12px; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: var(--fg); }
+details.row form button { flex: 0 0 auto; }
+button { font: inherit; font-size: 17px; padding: 0 16px; min-height: 48px; border-radius: 4px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); }
+button.report { margin-top: 16px; width: 100%; background: transparent; border: 0; color: var(--report); font-weight: 600; text-align: left; padding: 0; }
+details.info { margin-top: 32px; color: var(--muted); font-size: 14px; } details.info summary { min-height: 44px; display:flex; align-items:center; }
+.bar { position: fixed; left:0; right:0; bottom:0; display:flex; flex-direction: column; gap: 4px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: var(--surface); border-top: 1px solid var(--line); }
+.bar button.primary { min-height: 60px; font-size: 19px; font-weight: 700; background: var(--primary); color: var(--on-primary); border: 0; width: 100%; }
+.bar button.quiet { border: 0; background: transparent; color: var(--primary); }
+.bar .hint { margin: 0; text-align: center; color: var(--muted); font-size: 15px; padding: 8px 0; }
+#status { min-height: 1.5em; font-weight: 600; margin: 12px 0 0; }
+a { color: var(--primary); }
 `;
