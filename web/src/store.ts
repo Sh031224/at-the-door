@@ -7,6 +7,8 @@ export const TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 export interface StoredTrip {
   token: string;
   snapshot: CreateTripRequest;
+  /** 차량 앱이 재계획으로 내용을 바꿀 때마다 1씩 오른다 */
+  version: number;
   createdAt: number;
   expiresAt: number;
 }
@@ -25,6 +27,7 @@ export class TripStore {
       CREATE TABLE IF NOT EXISTS trips (
         token TEXT PRIMARY KEY,
         snapshot TEXT NOT NULL,
+        version INTEGER NOT NULL DEFAULT 1,
         created_at INTEGER NOT NULL,
         expires_at INTEGER NOT NULL
       );
@@ -36,6 +39,9 @@ export class TripStore {
         created_at INTEGER NOT NULL
       );
     `);
+    // 이전 개발용 DB에 version 열이 없으면 추가한다.
+    const cols = this.db.prepare("PRAGMA table_info(trips)").all() as Array<{ name: string }>;
+    if (!cols.some((c) => c.name === "version")) this.db.exec("ALTER TABLE trips ADD COLUMN version INTEGER NOT NULL DEFAULT 1");
   }
 
   create(snapshot: CreateTripRequest): StoredTrip {
@@ -44,19 +50,26 @@ export class TripStore {
     const expiresAt = createdAt + TOKEN_TTL_MS;
     this.db.prepare("INSERT INTO trips (token, snapshot, created_at, expires_at) VALUES (?, ?, ?, ?)")
       .run(token, JSON.stringify(snapshot), createdAt, expiresAt);
-    return { token, snapshot, createdAt, expiresAt };
+    return { token, snapshot, version: 1, createdAt, expiresAt };
+  }
+
+  /** 재계획 결과로 안내 내용을 바꾼다. 만료 시각은 늘리지 않는다 */
+  update(token: string, snapshot: CreateTripRequest): StoredTrip | null {
+    if (!this.get(token)) return null;
+    this.db.prepare("UPDATE trips SET snapshot = ?, version = version + 1 WHERE token = ?").run(JSON.stringify(snapshot), token);
+    return this.get(token);
   }
 
   get(token: string): StoredTrip | null {
-    const row = this.db.prepare("SELECT token, snapshot, created_at, expires_at FROM trips WHERE token = ?").get(token) as
-      | { token: string; snapshot: string; created_at: number; expires_at: number }
+    const row = this.db.prepare("SELECT token, snapshot, version, created_at, expires_at FROM trips WHERE token = ?").get(token) as
+      | { token: string; snapshot: string; version: number; created_at: number; expires_at: number }
       | undefined;
     if (!row) return null;
     if (row.expires_at <= this.now()) {
       this.delete(token);
       return null;
     }
-    return { token: row.token, snapshot: JSON.parse(row.snapshot), createdAt: row.created_at, expiresAt: row.expires_at };
+    return { token: row.token, snapshot: JSON.parse(row.snapshot), version: row.version, createdAt: row.created_at, expiresAt: row.expires_at };
   }
 
   addEvent(token: string, type: PhoneEventType, note?: string): PhoneEvent | null {

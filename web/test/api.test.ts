@@ -2,17 +2,20 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createApp } from "../src/app.tsx";
 import { TOKEN_TTL_MS, TripStore } from "../src/store.ts";
-import type { CreateTripRequest, CreateTripResponse, TripStatusResponse } from "../src/contract.ts";
+import type { CreateTripRequest, CreateTripResponse, PlanResponse, TripStatusResponse } from "../src/contract.ts";
 
 const snapshot: CreateTripRequest = {
   venueName: "새봄문화회관 소공연장",
   planName: "후문 일반 주차 구역",
   entranceName: "후문",
-  entrancePhotos: ["saebom-hall/e-back-1.jpg"],
+  entrancePhotos: ["saebom-hall/e-back-1.png"],
+  photosAreIllustrations: true,
   steps: ["파란 안내판을 지나 후문으로 이동"],
-  conditionLabels: ["계단 없는 동선", "운전자와 함께 이동"],
+  returnSteps: [],
   parkingNote: null,
   evidenceLabel: "데모 현장 조사 · 2026-11-01",
+  demo: true,
+  contact: "02-000-0000",
 };
 
 function setup(now = () => 1_000) {
@@ -69,4 +72,68 @@ test("만료된 링크는 열리지 않는다", async () => {
 test("형식이 틀린 계획은 거절한다", async () => {
   const { app, json } = setup();
   assert.equal((await app.request("/api/trips", json({ ...snapshot, steps: "not-an-array" }))).status, 400);
+});
+
+test("시연 데이터와 일러스트는 페이지에 그렇다고 표시된다", async () => {
+  const { app, json } = setup();
+  const { token } = (await (await app.request("/api/trips", json(snapshot))).json()) as CreateTripResponse;
+  const html = await (await app.request(`/t/${token}`)).text();
+  assert.ok(html.includes("시연 데이터"));
+  assert.ok(html.includes("실제 사진 아님"));
+});
+
+test("입구 도착을 누르면 방문 화면, 복귀를 누르면 주차 메모와 거꾸로 된 순서가 보인다", async () => {
+  const { app, json } = setup();
+  const { token } = (await (await app.request("/api/trips", json({ ...snapshot, parkingNote: "B2 C구역", steps: ["첫째", "둘째"] }))).json()) as CreateTripResponse;
+  await app.request(`/api/trips/${token}/events`, json({ type: "arrived" }));
+  const visit = await (await app.request(`/t/${token}`)).text();
+  assert.ok(visit.includes("입구 도착을 확인했어요"));
+  assert.ok(!visit.includes("입구에 도착했어요"));
+  await app.request(`/api/trips/${token}/events`, json({ type: "returning" }));
+  const back = await (await app.request(`/t/${token}`)).text();
+  assert.ok(back.includes("B2 C구역"));
+  assert.ok(back.indexOf("둘째") < back.indexOf("첫째"));
+});
+
+test("재계획으로 안내가 바뀌면 같은 링크의 버전이 오르고 새 입구가 보인다", async () => {
+  const { app, json } = setup();
+  const { token } = (await (await app.request("/api/trips", json(snapshot))).json()) as CreateTripResponse;
+  const before = (await (await app.request(`/api/trips/${token}/plan`)).json()) as PlanResponse;
+  const put = await app.request(`/api/trips/${token}`, { ...json({ ...snapshot, entranceName: "정문" }), method: "PUT" });
+  assert.equal(put.status, 204);
+  const after = (await (await app.request(`/api/trips/${token}/plan`)).json()) as PlanResponse;
+  assert.equal(after.version, before.version + 1);
+  assert.ok((await (await app.request(`/t/${token}`)).text()).includes("정문까지 함께 가요"));
+});
+
+test("형식이 틀린 토큰은 조회하지 않는다", async () => {
+  const { app } = setup();
+  assert.equal((await app.request(`/t/<script>`)).status, 404);
+  assert.equal((await app.request(`/api/trips/short`)).status, 404);
+});
+
+test("휴대폰에서 남긴 주차 메모가 다시 열어도 보인다", async () => {
+  const { app, json } = setup();
+  const { token } = (await (await app.request("/api/trips", json(snapshot))).json()) as CreateTripResponse;
+  await app.request(`/api/trips/${token}/events`, json({ type: "parking_note", note: "B2 C구역 14번" }));
+  assert.ok((await (await app.request(`/t/${token}`)).text()).includes("B2 C구역 14번"));
+});
+
+test("돌아가는 순서 데이터가 있으면 그것을 보여 준다", async () => {
+  const { app, json } = setup();
+  const { token } = (await (await app.request("/api/trips", json({ ...snapshot, returnSteps: ["후문으로 나가기", "주차장으로"] }))).json()) as CreateTripResponse;
+  await app.request(`/api/trips/${token}/events`, json({ type: "arrived" }));
+  await app.request(`/api/trips/${token}/events`, json({ type: "returning" }));
+  const html = await (await app.request(`/t/${token}`)).text();
+  assert.ok(html.includes("돌아가는 순서"));
+  assert.ok(html.includes("후문으로 나가기"));
+});
+
+test("입구 도착을 되돌리면 다시 입구 안내가 보인다", async () => {
+  const { app, json } = setup();
+  const { token } = (await (await app.request("/api/trips", json(snapshot))).json()) as CreateTripResponse;
+  await app.request(`/api/trips/${token}/events`, json({ type: "arrived" }));
+  await app.request(`/api/trips/${token}/events`, json({ type: "arrival_undone" }));
+  const html = await (await app.request(`/t/${token}`)).text();
+  assert.ok(html.includes("후문까지 함께 가요"));
 });

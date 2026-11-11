@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { serveStatic } from "@hono/node-server/serve-static";
-import { PHONE_EVENT_TYPES, isCreateTripRequest, type CreateTripResponse, type PhoneEventType, type TripStatusResponse } from "./contract.ts";
+import { PHONE_EVENT_TYPES, isCreateTripRequest, type CreateTripResponse, type PhoneEventType, type PlanResponse, type TripStatusResponse } from "./contract.ts";
 import { ExpiredPage, GuidePage } from "./page.tsx";
 import type { TripStore } from "./store.ts";
 
@@ -14,6 +14,12 @@ export interface AppOptions {
 
 export function createApp({ store, publicBaseUrl, photosDir }: AppOptions) {
   const app = new Hono();
+  const TOKEN = /^[A-Za-z0-9_-]{22}$/;
+
+  // 토큰 형식이 틀리면 저장소를 조회하지 않는다(페이지 스크립트에 토큰을 그대로 넣으므로 형식을 보장한다).
+  app.use("/t/:token", async (c, next) => (TOKEN.test(c.req.param("token")) ? next() : c.html(<ExpiredPage />, 404)));
+  app.use("/api/trips/:token/*", async (c, next) => (TOKEN.test(c.req.param("token")) ? next() : c.json({ error: "not_found" }, 404)));
+  app.use("/api/trips/:token", async (c, next) => (TOKEN.test(c.req.param("token")) ? next() : c.json({ error: "not_found" }, 404)));
 
   app.get("/healthz", (c) => c.text("ok"));
 
@@ -33,6 +39,24 @@ export function createApp({ store, publicBaseUrl, photosDir }: AppOptions) {
     const token = c.req.param("token");
     if (!store.get(token)) return c.json({ error: "not_found" }, 404);
     const res: TripStatusResponse = { events: store.events(token) };
+    return c.json(res);
+  });
+
+  // 차량 앱: 재계획으로 바뀐 안내 내용 반영(같은 링크 유지)
+  app.put("/api/trips/:token", async (c) => {
+    const body = await c.req.json().catch(() => null);
+    if (!isCreateTripRequest(body)) return c.json({ error: "invalid_body" }, 400);
+    const trip = store.update(c.req.param("token"), body);
+    if (!trip) return c.json({ error: "not_found" }, 404);
+    return c.body(null, 204);
+  });
+
+  // 휴대폰: 현재 안내 내용과 버전. 버전이 바뀌면 페이지를 새로 그린다
+  app.get("/api/trips/:token/plan", (c) => {
+    c.header("Cache-Control", "no-store");
+    const trip = store.get(c.req.param("token"));
+    if (!trip) return c.json({ error: "not_found" }, 404);
+    const res: PlanResponse = { version: trip.version, snapshot: trip.snapshot };
     return c.json(res);
   });
 
@@ -60,7 +84,7 @@ export function createApp({ store, publicBaseUrl, photosDir }: AppOptions) {
     c.header("Referrer-Policy", "no-referrer");
     const trip = store.get(c.req.param("token"));
     if (!trip) return c.html(<ExpiredPage />, 404);
-    return c.html(<GuidePage trip={trip} />);
+    return c.html(<GuidePage trip={trip} events={store.events(trip.token)} />);
   });
 
   return app;
