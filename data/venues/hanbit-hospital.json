@@ -1,0 +1,215 @@
+{
+  "venueId": "hanbit-hospital",
+  "name": "한빛종합병원 본관",
+  "category": "종합병원",
+  "area": "본관 1층 외래 접수",
+  "aliases": [
+    "한빛종합병원",
+    "한빛병원",
+    "한빛"
+  ],
+  "demo": true,
+  "contact": "02-000-0001",
+  "entrances": [
+    {
+      "id": "E-main",
+      "name": "본관 정문",
+      "point": [
+        37.5101,
+        127.0401
+      ],
+      "photos": [
+        "hanbit-hospital/e-main-1.png"
+      ],
+      "photoKind": "illustration",
+      "hours": "06:00-21:00",
+      "stepFree": {
+        "value": true,
+        "evidence": "ev-h1"
+      }
+    },
+    {
+      "id": "E-b2",
+      "name": "본관 지하 2층 엘리베이터 홀",
+      "point": [
+        37.51,
+        127.0403
+      ],
+      "photos": [
+        "hanbit-hospital/e-b2-1.png"
+      ],
+      "photoKind": "illustration",
+      "hours": "00:00-23:59",
+      "stepFree": {
+        "value": true,
+        "evidence": "ev-h1"
+      }
+    },
+    {
+      "id": "E-annex",
+      "name": "외래동 출입구",
+      "point": [
+        37.5103,
+        127.0398
+      ],
+      "photos": [],
+      "hours": "07:00-19:00",
+      "stepFree": {
+        "value": false,
+        "evidence": "ev-h1"
+      }
+    }
+  ],
+  "candidates": [
+    {
+      "id": "A",
+      "type": "dropoff",
+      "name": "본관 정문 승하차 구역",
+      "accessPoint": {
+        "point": [
+          37.5102,
+          127.04
+        ],
+        "approach": "한빛종합병원 본관 정문 회차로"
+      },
+      "leavesPassengerAlone": true,
+      "driverParkingId": "B",
+      "walk": {
+        "toEntrance": "E-main",
+        "stairs": {
+          "value": false,
+          "evidence": "ev-h1"
+        },
+        "distanceM": {
+          "value": 10,
+          "evidence": "ev-h1"
+        },
+        "steps": [
+          "회차로 승하차 구역에서 본관 정문 자동문으로 이동"
+        ],
+        "returnSteps": [
+          "본관 정문 자동문으로 나와 회차로 승하차 구역에서 기다리기"
+        ]
+      }
+    },
+    {
+      "id": "B",
+      "type": "parking",
+      "name": "본관 지하 2층 일반 주차장",
+      "accessPoint": {
+        "point": [
+          37.5099,
+          127.0405
+        ],
+        "approach": "한빛종합병원 본관 지하 주차장 입구"
+      },
+      "lotId": "lot-b2",
+      "eligibility": "general",
+      "hours": "00:00-23:59",
+      "liveAvailability": null,
+      "walk": {
+        "toEntrance": "E-b2",
+        "stairs": {
+          "value": false,
+          "evidence": "ev-h1"
+        },
+        "distanceM": {
+          "value": 40,
+          "evidence": "ev-h1"
+        },
+        "steps": [
+          "‘본관 엘리베이터’ 표지판을 따라 지하 2층 엘리베이터 홀로 이동",
+          "엘리베이터로 1층에 올라가 외래 접수로 이동"
+        ],
+        "returnSteps": [
+          "1층 외래 접수 옆 엘리베이터로 지하 2층",
+          "‘주차장’ 표지판을 따라 차로"
+        ],
+        "wheelchair": {
+          "value": true,
+          "evidence": "ev-h1"
+        }
+      },
+      "floors": [
+        "B2"
+      ]
+    },
+    {
+      "id": "C",
+      "type": "parking",
+      "name": "외래동 지상 주차장",
+      "accessPoint": {
+        "point": [
+          37.5104,
+          127.0397
+        ],
+        "approach": "한빛종합병원 외래동 주차장 입구"
+      },
+      "eligibility": "general",
+      "hours": "07:00-20:00",
+      "walk": {
+        "toEntrance": "E-annex",
+        "stairs": {
+          "value": true,
+          "evidence": "ev-h1"
+        },
+        "distanceM": {
+          "value": 30,
+          "evidence": "ev-h1"
+        },
+        "steps": [
+          "주차장에서 외래동 출입구 계단(3단)으로 이동"
+        ]
+      },
+      "floors": [
+        "지상"
+      ]
+    },
+    {
+      "id": "D",
+      "type": "parking",
+      "name": "본관 정문 장애인 전용 주차 구역",
+      "accessPoint": {
+        "point": [
+          37.51015,
+          127.04015
+        ],
+        "approach": "한빛종합병원 본관 정문 주차 구역"
+      },
+      "eligibility": "disabled_only",
+      "hours": "00:00-23:59",
+      "walk": {
+        "toEntrance": "E-main",
+        "stairs": {
+          "value": false,
+          "evidence": "ev-h1"
+        },
+        "distanceM": {
+          "value": 20,
+          "evidence": "ev-h1"
+        },
+        "steps": [
+          "주차 구역 앞 보도를 따라 본관 정문 자동문으로 이동"
+        ],
+        "returnSteps": [
+          "본관 정문 자동문으로 나와 바로 앞 주차 구역으로"
+        ],
+        "wheelchair": {
+          "value": true,
+          "evidence": "ev-h1"
+        }
+      },
+      "floors": [
+        "지상"
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "id": "ev-h1",
+      "source": "시연용 가상 데이터(현장 조사 아님)",
+      "checkedAt": "2026-11-08",
+      "status": "demo"
+    }
+  ]
+}

@@ -1,24 +1,50 @@
 {
   "venueId": "saebom-hall",
   "name": "새봄문화회관 소공연장",
+  "category": "공연장",
+  "area": "2층 소공연장",
+  "aliases": [
+    "새봄문화회관",
+    "새봄회관",
+    "새봄"
+  ],
   "demo": true,
   "contact": "02-000-0000",
   "entrances": [
     {
       "id": "E-front",
       "name": "정문",
-      "point": [37.50010, 127.03600],
-      "photos": ["saebom-hall/e-front-1.jpg"],
+      "point": [
+        37.5001,
+        127.036
+      ],
+      "photos": [
+        "saebom-hall/e-front-1.png"
+      ],
+      "photoKind": "illustration",
       "hours": "09:00-22:00",
-      "stepFree": { "value": true, "evidence": "ev-1" }
+      "stepFree": {
+        "value": true,
+        "evidence": "ev-1"
+      }
     },
     {
       "id": "E-back",
       "name": "후문",
-      "point": [37.49960, 127.03640],
-      "photos": ["saebom-hall/e-back-1.jpg", "saebom-hall/e-back-2.jpg"],
+      "point": [
+        37.4996,
+        127.0364
+      ],
+      "photos": [
+        "saebom-hall/e-back-1.png",
+        "saebom-hall/e-back-2.png"
+      ],
+      "photoKind": "illustration",
       "hours": "09:00-22:00",
-      "stepFree": { "value": true, "evidence": "ev-1" }
+      "stepFree": {
+        "value": true,
+        "evidence": "ev-1"
+      }
     }
   ],
   "candidates": [
@@ -26,46 +52,194 @@
       "id": "A",
       "type": "dropoff",
       "name": "정문 승하차 구역",
-      "accessPoint": { "point": [37.50020, 127.03590], "approach": "정문 진입로" },
+      "accessPoint": {
+        "point": [
+          37.5002,
+          127.0359
+        ],
+        "approach": "새봄문화회관 정문 진입로"
+      },
       "leavesPassengerAlone": true,
       "driverParkingId": "B",
       "walk": {
         "toEntrance": "E-front",
-        "stairs": { "value": false, "evidence": "ev-1" },
-        "distanceM": { "value": 15, "evidence": "ev-1" },
-        "steps": ["승하차 구역에서 정문 자동문으로 이동"]
+        "stairs": {
+          "value": false,
+          "evidence": "ev-1"
+        },
+        "distanceM": {
+          "value": 15,
+          "evidence": "ev-1"
+        },
+        "steps": [
+          "승하차 구역에서 정문 자동문으로 이동"
+        ],
+        "returnSteps": [
+          "정문 자동문으로 나와 승하차 구역에서 차를 기다리기"
+        ]
       }
     },
     {
       "id": "B",
       "type": "parking",
       "name": "후문 일반 주차 구역",
-      "accessPoint": { "point": [37.49940, 127.03660], "approach": "후문 주차장 입구" },
+      "accessPoint": {
+        "point": [
+          37.4994,
+          127.0366
+        ],
+        "approach": "새봄문화회관 후문 주차장 입구"
+      },
+      "lotId": "lot-back",
       "eligibility": "general",
       "hours": "08:00-23:00",
       "liveAvailability": null,
       "walk": {
         "toEntrance": "E-back",
-        "stairs": { "value": false, "evidence": "ev-1" },
-        "distanceM": { "value": 80, "evidence": "ev-1" },
-        "steps": ["주차장 출구 쪽 보행로로 나가기", "파란 안내판을 지나 후문으로 이동"]
-      }
+        "stairs": {
+          "value": false,
+          "evidence": "ev-1"
+        },
+        "distanceM": {
+          "value": 80,
+          "evidence": "ev-1"
+        },
+        "steps": [
+          "주차장 출구 쪽 보행로로 나가기",
+          "파란 안내판을 지나 후문으로 이동",
+          "후문 자동문으로 들어가 엘리베이터로 2층"
+        ],
+        "returnSteps": [
+          "후문 자동문으로 나가기",
+          "파란 안내판 쪽 보행로를 따라 주차장으로"
+        ]
+      },
+      "floors": [
+        "지상"
+      ]
+    },
+    {
+      "id": "B2",
+      "type": "parking",
+      "name": "후문 일반 주차 구역 → 정문 경사로",
+      "accessPoint": {
+        "point": [
+          37.4994,
+          127.0366
+        ],
+        "approach": "새봄문화회관 후문 주차장 입구"
+      },
+      "lotId": "lot-back",
+      "eligibility": "general",
+      "hours": "08:00-23:00",
+      "liveAvailability": null,
+      "walk": {
+        "toEntrance": "E-front",
+        "stairs": {
+          "value": false,
+          "evidence": "ev-1"
+        },
+        "distanceM": {
+          "value": 140,
+          "evidence": "ev-1"
+        },
+        "steps": [
+          "주차장 출구 쪽 보행로로 나가기",
+          "건물 앞 보도를 따라 정문 쪽으로 이동",
+          "정문 오른쪽 경사로로 올라가 자동문으로 들어가기"
+        ],
+        "returnSteps": [
+          "정문 경사로로 내려가기",
+          "건물 앞 보도를 따라 후문 주차장으로"
+        ],
+        "wheelchair": {
+          "value": true,
+          "evidence": "ev-1"
+        }
+      },
+      "floors": [
+        "지상"
+      ]
+    },
+    {
+      "id": "E",
+      "type": "parking",
+      "name": "인근 공영주차장",
+      "accessPoint": {
+        "point": [
+          37.5008,
+          127.0352
+        ],
+        "approach": "새봄문화회관 인근 공영주차장 입구"
+      },
+      "lotId": "lot-public",
+      "eligibility": "general",
+      "hours": "06:00-23:59",
+      "liveAvailability": null,
+      "walk": {
+        "toEntrance": "E-front",
+        "stairs": {
+          "value": false,
+          "evidence": "ev-1"
+        },
+        "distanceM": {
+          "value": 220,
+          "evidence": "ev-1"
+        },
+        "steps": [
+          "공영주차장 출구에서 건물 쪽 보도로 나가기",
+          "신호등 있는 횡단보도를 건너 정문 쪽으로",
+          "정문 오른쪽 경사로로 올라가 자동문으로 들어가기"
+        ],
+        "returnSteps": [
+          "정문 경사로로 내려가기",
+          "횡단보도를 건너 공영주차장으로"
+        ],
+        "wheelchair": {
+          "value": true,
+          "evidence": "ev-1"
+        }
+      },
+      "floors": [
+        "지상"
+      ]
     },
     {
       "id": "C",
       "type": "parking",
       "name": "지하 주차장",
-      "accessPoint": { "point": [37.50000, 127.03550], "approach": "지하 진입로" },
+      "accessPoint": {
+        "point": [
+          37.5,
+          127.0355
+        ],
+        "approach": "새봄문화회관 지하 주차장 진입로"
+      },
       "eligibility": "general",
       "walk": {
         "toEntrance": "E-front",
-        "stairs": { "value": null, "evidence": null },
-        "distanceM": { "value": null, "evidence": null },
+        "stairs": {
+          "value": null,
+          "evidence": null
+        },
+        "distanceM": {
+          "value": null,
+          "evidence": null
+        },
         "steps": []
-      }
+      },
+      "floors": [
+        "B1",
+        "B2"
+      ]
     }
   ],
   "evidence": [
-    { "id": "ev-1", "source": "데모 현장 조사", "checkedAt": "2026-11-01", "status": "demo" }
+    {
+      "id": "ev-1",
+      "source": "시연용 가상 데이터(현장 조사 아님)",
+      "checkedAt": "2026-11-01",
+      "status": "demo"
+    }
   ]
 }

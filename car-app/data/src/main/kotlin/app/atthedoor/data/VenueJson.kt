@@ -9,6 +9,7 @@ import app.atthedoor.domain.model.Evidence
 import app.atthedoor.domain.model.Fact
 import app.atthedoor.domain.model.GeoPoint
 import app.atthedoor.domain.model.OpeningHours
+import app.atthedoor.domain.model.PhotoKind
 import app.atthedoor.domain.model.Venue
 import app.atthedoor.domain.model.VerificationStatus
 import app.atthedoor.domain.model.WalkRoute
@@ -20,7 +21,18 @@ import java.time.LocalTime
 object VenueJson {
     private val json = Json { ignoreUnknownKeys = true }
 
-    fun parse(text: String): Venue = json.decodeFromString(VenueDto.serializer(), text).toDomain()
+    fun parse(text: String): Venue = json.decodeFromString(VenueDto.serializer(), text).toDomain().also(::validate)
+
+    /** 데이터 파일의 참조 오류를 앱 실행 전에(단위 테스트에서) 잡는다. */
+    private fun validate(v: Venue) {
+        val entranceIds = v.entrances.map { it.id }.toSet()
+        val candidateIds = v.candidates.map { it.id }
+        require(candidateIds.size == candidateIds.toSet().size) { "${v.id}: duplicate candidate id" }
+        v.candidates.forEach { c ->
+            require(c.walk.toEntranceId in entranceIds) { "${v.id}/${c.id}: unknown entrance ${c.walk.toEntranceId}" }
+            c.driverParkingId?.let { require(it in candidateIds) { "${v.id}/${c.id}: unknown driverParkingId $it" } }
+        }
+    }
 
     @Serializable
     private data class VenueDto(
@@ -28,6 +40,9 @@ object VenueJson {
         val name: String,
         val demo: Boolean,
         val contact: String? = null,
+        val area: String? = null,
+        val category: String? = null,
+        val aliases: List<String> = emptyList(),
         val entrances: List<EntranceDto>,
         val candidates: List<CandidateDto>,
         val evidence: List<EvidenceDto>,
@@ -39,6 +54,8 @@ object VenueJson {
         val name: String,
         val point: List<Double>,
         val photos: List<String> = emptyList(),
+        /** "photo"(실제 사진) 또는 "illustration"(시연용 일러스트). 없으면 photo */
+        val photoKind: String = "photo",
         val hours: String? = null,
         val stepFree: FactDto<Boolean>? = null,
     )
@@ -50,11 +67,13 @@ object VenueJson {
         val name: String,
         val accessPoint: AccessPointDto,
         val walk: WalkDto,
+        val lotId: String? = null,
         val leavesPassengerAlone: Boolean = false,
         val driverParkingId: String? = null,
         val eligibility: String = "general",
         val hours: String? = null,
         val liveAvailability: String? = null,
+        val floors: List<String> = emptyList(),
     )
 
     @Serializable
@@ -66,6 +85,8 @@ object VenueJson {
         val stairs: FactDto<Boolean>? = null,
         val distanceM: FactDto<Int>? = null,
         val steps: List<String> = emptyList(),
+        val returnSteps: List<String> = emptyList(),
+        val wheelchair: FactDto<Boolean>? = null,
     )
 
     @Serializable
@@ -82,8 +103,18 @@ object VenueJson {
             name = name,
             demo = demo,
             contact = contact,
+            area = area,
+            category = category,
+            aliases = aliases,
             entrances = entrances.map { e ->
-                Entrance(e.id, e.name, e.point.geo(), e.photos, e.hours?.hours(), e.stepFree.fact())
+                Entrance(
+                    e.id, e.name, e.point.geo(), e.photos, e.hours?.hours(), e.stepFree.fact(),
+                    photoKind = when (e.photoKind) {
+                        "photo" -> PhotoKind.PHOTO
+                        "illustration" -> PhotoKind.ILLUSTRATION
+                        else -> error("unknown photoKind: ${e.photoKind}")
+                    },
+                )
             },
             candidates = candidates.map { c ->
                 Candidate(
@@ -95,12 +126,14 @@ object VenueJson {
                     },
                     name = c.name,
                     accessPoint = AccessPoint(c.accessPoint.point.geo(), c.accessPoint.approach),
-                    walk = WalkRoute(c.walk.toEntrance, c.walk.stairs.fact(), c.walk.distanceM.fact(), c.walk.steps),
+                    walk = WalkRoute(c.walk.toEntrance, c.walk.stairs.fact(), c.walk.distanceM.fact(), c.walk.steps, c.walk.returnSteps, c.walk.wheelchair.fact()),
+                    lotId = c.lotId ?: c.id,
                     leavesPassengerAlone = c.leavesPassengerAlone,
                     driverParkingId = c.driverParkingId,
                     eligibility = if (c.eligibility == "disabled_only") Eligibility.DISABLED_ONLY else Eligibility.GENERAL,
                     hours = c.hours?.hours(),
                     liveAvailabilitySource = c.liveAvailability,
+                    floors = c.floors,
                 )
             },
         )

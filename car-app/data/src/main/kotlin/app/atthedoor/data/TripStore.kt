@@ -4,8 +4,10 @@ import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import app.atthedoor.domain.model.GeoPoint
 import app.atthedoor.domain.model.MobilityAid
 import app.atthedoor.domain.model.TravelConditions
+import app.atthedoor.domain.trip.FeedbackKind
 import app.atthedoor.domain.trip.Trip
 import app.atthedoor.domain.trip.TripPhase
 import kotlinx.coroutines.flow.first
@@ -44,8 +46,12 @@ object TripCodec {
         val phase: String,
         val selectedCandidateId: String? = null,
         val unavailableIds: Set<String> = emptySet(),
+        val blockedEntranceIds: Set<String> = emptySet(),
         val parkingNote: String? = null,
+        val parkedAt: List<Double>? = null,
         val resumePhase: String? = null,
+        val notice: String? = null,
+        val feedback: Set<String>? = null,
         val processedEventIds: Set<String> = emptySet(),
         val conditions: ConditionsRecord? = null,
     )
@@ -68,8 +74,12 @@ object TripCodec {
             phase = t.phase.name,
             selectedCandidateId = t.selectedCandidateId,
             unavailableIds = t.unavailableIds,
+            blockedEntranceIds = t.blockedEntranceIds,
             parkingNote = t.parkingNote,
+            parkedAt = t.parkedAt?.let { listOf(it.lat, it.lng) },
             resumePhase = t.resumePhase?.name,
+            notice = t.notice,
+            feedback = t.feedback?.map { it.name }?.toSet(),
             processedEventIds = t.processedEventIds,
             conditions = t.conditions?.let {
                 ConditionsRecord(it.companionRequired, it.otherGuardian, it.stepFreeRequired, it.preferShortWalk, it.mobilityAid.name, it.hasDisabledParkingPermit)
@@ -85,8 +95,12 @@ object TripCodec {
             phase = TripPhase.valueOf(r.phase),
             selectedCandidateId = r.selectedCandidateId,
             unavailableIds = r.unavailableIds,
+            blockedEntranceIds = r.blockedEntranceIds,
             parkingNote = r.parkingNote,
+            parkedAt = r.parkedAt?.takeIf { it.size == 2 }?.let { GeoPoint(it[0], it[1]) },
             resumePhase = r.resumePhase?.let(TripPhase::valueOf),
+            notice = r.notice,
+            feedback = r.feedback?.map(FeedbackKind::valueOf)?.toSet(),
             processedEventIds = r.processedEventIds,
             conditions = r.conditions?.let {
                 TravelConditions(it.companionRequired, it.otherGuardian, it.stepFreeRequired, it.preferShortWalk, MobilityAid.valueOf(it.mobilityAid), it.hasDisabledParkingPermit)
