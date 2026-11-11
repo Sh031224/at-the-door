@@ -1,212 +1,222 @@
 package app.atthedoor.app.ui
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.atthedoor.app.TripUiState
 import app.atthedoor.app.TripViewModel
-import app.atthedoor.domain.model.TravelConditions
-import app.atthedoor.domain.plan.CandidateResult
-import app.atthedoor.domain.plan.VerdictKind
+import app.atthedoor.app.ui.components.NoticeBanner
+import app.atthedoor.app.ui.components.NoticeTone
+import app.atthedoor.app.ui.components.Pill
+import app.atthedoor.app.ui.screens.ApproachScreen
+import app.atthedoor.app.ui.screens.ChoosingScreen
+import app.atthedoor.app.ui.screens.DemoControlsPanel
+import app.atthedoor.app.ui.screens.DoneScreen
+import app.atthedoor.app.ui.screens.DrivingPanel
+import app.atthedoor.app.ui.screens.HandoffScreen
+import app.atthedoor.app.ui.screens.NaviRequestScreen
+import app.atthedoor.app.ui.screens.NeedsCheckScreen
+import app.atthedoor.app.ui.screens.PhaseActions
+import app.atthedoor.app.ui.screens.PlanningActionBar
+import app.atthedoor.app.ui.screens.hasPhaseActions
+import app.atthedoor.app.ui.screens.PlanningScreen
+import app.atthedoor.app.ui.screens.ReturnScreen
+import app.atthedoor.app.ui.screens.VisitScreen
+import app.atthedoor.domain.trip.TripMachine
 import app.atthedoor.domain.trip.TripPhase
-import com.google.zxing.BarcodeFormat
-import com.google.zxing.qrcode.QRCodeWriter
 
 /**
- * 첫 구현 단위의 단일 화면. 여행 단계(TripPhase)와 주행 제한 상태에 따라 내용을 바꾼다.
- * 주행 제한 중에는 어떤 단계든 최소 화면만 보여 준다(여행 상태와 UI 제한을 분리).
+ * 앱의 뼈대. 왼쪽에는 여행 진행 단계, 오른쪽에는 단계별 화면을 둔다.
+ * 주행 제한 중에는 여행이 어느 단계든 최소 화면(현재 계획, 다음 지점, 내비 상태)만 보여 준다.
  */
 @Composable
-fun TripScreen(vm: TripViewModel) {
+fun TripScreen(vm: TripViewModel, onSwitchMode: () -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     val restricted by vm.drivingRestricted.collectAsStateWithLifecycle()
     val setupBlocked by vm.setupBlocked.collectAsStateWithLifecycle()
+    val cue by vm.handoffCue.collectAsStateWithLifecycle()
 
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-        Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(Modifier.fillMaxSize()) {
             if (vm.isFake) FakeBanner()
-            Header(state)
-            state.trip?.notice?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            when {
-                restricted -> DrivingPanel(state)
-                else -> PhaseContent(vm, state, setupBlocked)
+            Row(Modifier.fillMaxSize()) {
+                if (!restricted) {
+                    ProgressRail(state, vm, onSwitchMode, Modifier.width(360.dp).fillMaxHeight())
+                }
+                Box(Modifier.weight(1f).fillMaxHeight()) {
+                    if (restricted) {
+                        DrivingPanel(state, onParkingFull = vm::reportParkingFull)
+                    } else Column(Modifier.fillMaxSize()) {
+                        // 단계나 조건이 바뀌면 맨 위부터 보여 준다. 바뀐 결과와 알림이 화면 밖에 남지 않게 한다.
+                        val scroll = rememberScrollState()
+                        androidx.compose.runtime.LaunchedEffect(state.trip?.phase, state.trip?.conditions, state.replanned) { scroll.scrollTo(0) }
+                        val planning = state.trip?.phase == TripPhase.PLANNING
+                        Column(
+                            Modifier.fillMaxWidth().weight(1f, fill = true).verticalScroll(scroll).padding(horizontal = 40.dp, vertical = 32.dp),
+                            verticalArrangement = Arrangement.spacedBy(24.dp),
+                        ) {
+                            // 재계획 결과는 이유가 담긴 replanned 문구로 보여 주므로 일반 문구는 겹쳐 띄우지 않는다.
+                            state.trip?.notice?.takeIf { !(it == TripMachine.NOTICE_ALTERNATIVE && state.replanned != null) }?.let { notice ->
+                                val tone = if (notice == TripMachine.NOTICE_ALTERNATIVE) NoticeTone.SUCCESS else NoticeTone.WARN
+                                NoticeBanner(notice, tone = tone)
+                            }
+                            cue?.let { NoticeBanner(it.message, tone = NoticeTone.INFO) }
+                            state.replanned?.let { NoticeBanner(it, tone = NoticeTone.SUCCESS) }
+                            PhaseContent(vm, state, setupBlocked)
+                            // 하단 고정 버튼에 마지막 안내문이 가려지지 않게 여백을 둔다.
+                            Spacer(Modifier.height(24.dp))
+                        }
+                        if (!state.loading && (planning || hasPhaseActions(state.trip?.phase))) {
+                            Box(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(horizontal = 40.dp, vertical = 20.dp)) {
+                                if (planning) PlanningActionBar(state, vm) else PhaseActions(state, vm)
+                            }
+                        }
+                    }
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun PhaseContent(vm: TripViewModel, state: TripUiState, setupBlocked: Boolean) {
+    if (state.loading) return
+    when (state.trip?.phase) {
+        null, TripPhase.PLANNING -> PlanningScreen(state, vm)
+        TripPhase.CHOOSING -> ChoosingScreen(state, vm)
+        TripPhase.NAVI_REQUESTED -> NaviRequestScreen(state, vm)
+        TripPhase.APPROACHING -> ApproachScreen(state, vm)
+        TripPhase.PARKED, TripPhase.WALKING -> HandoffScreen(state, vm, setupBlocked)
+        TripPhase.VISITING -> VisitScreen(state, vm)
+        TripPhase.RETURNING -> ReturnScreen(state, vm)
+        TripPhase.REPLANNING -> Row(verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.material3.CircularProgressIndicator(Modifier.size(44.dp))
+            Spacer(Modifier.width(20.dp))
+            Text("같은 조건으로 다른 계획을 찾고 있어요", style = MaterialTheme.typography.headlineMedium)
+        }
+        TripPhase.NEEDS_CHECK -> NeedsCheckScreen(state, vm)
+        TripPhase.COMPLETED, TripPhase.CANCELLED -> DoneScreen(state, vm)
     }
 }
 
 @Composable
 private fun FakeBanner() {
     Text(
-        "모의 응답 모드: 차량·내비 SDK 대신 가짜 구현을 사용 중",
-        Modifier.fillMaxWidth().background(Color(0xFF8A6D00)).padding(8.dp),
+        "모의 응답 모드 · 차량·내비 SDK 대신 가짜 구현을 쓰는 중이에요",
+        Modifier.fillMaxWidth().background(Color(0xFF7A5A00)).padding(horizontal = 24.dp, vertical = 10.dp),
         color = Color.White,
+        style = MaterialTheme.typography.titleMedium,
     )
 }
 
-@Composable
-private fun Header(state: TripUiState) {
-    Column {
-        Text(state.venue?.name ?: "시설 데이터를 불러오는 중", fontSize = 28.sp)
-        if (state.venue?.demo == true) Text("데모 데이터 · 실제 시설 검증 결과가 아님", color = Color.Gray)
-    }
-}
+private data class Stage(val label: String, val phases: Set<TripPhase>)
 
-/** 주행 중 최소 화면: 현재 계획, 다음 지점, 내비 연결 상태 */
-@Composable
-private fun DrivingPanel(state: TripUiState) {
-    val plan = state.trip?.selectedCandidateId?.let { state.venue?.candidate(it) }
-    Text(plan?.name ?: "계획 없음", fontSize = 32.sp)
-    plan?.let { Text("다음 지점: ${it.accessPoint.approach}", fontSize = 24.sp) }
-    Text(
-        when (state.trip?.phase) {
-            TripPhase.APPROACHING -> "내비게이션 안내 중"
-            TripPhase.NAVI_REQUESTED -> "내비게이션 연결 중"
-            else -> "주차 후 자세한 안내를 볼 수 있어요"
-        },
-        fontSize = 22.sp,
-    )
-}
+private val stages = listOf(
+    Stage("목적지·조건", setOf(TripPhase.PLANNING)),
+    Stage("도착 계획 비교", setOf(TripPhase.CHOOSING, TripPhase.REPLANNING, TripPhase.NEEDS_CHECK)),
+    Stage("내비 연결", setOf(TripPhase.NAVI_REQUESTED)),
+    Stage("차량 접근", setOf(TripPhase.APPROACHING)),
+    Stage("주차·휴대폰 연결", setOf(TripPhase.PARKED)),
+    Stage("입구까지 이동", setOf(TripPhase.WALKING)),
+    Stage("방문", setOf(TripPhase.VISITING)),
+    Stage("차로 복귀", setOf(TripPhase.RETURNING)),
+    Stage("완료", setOf(TripPhase.COMPLETED, TripPhase.CANCELLED)),
+)
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun PhaseContent(vm: TripViewModel, state: TripUiState, setupBlocked: Boolean) {
-    when (state.trip?.phase) {
-        null, TripPhase.PLANNING -> ConditionsPanel(state.conditions, vm::setConditions, vm::confirmConditions)
-        TripPhase.CHOOSING -> PlanComparison(vm, state)
-        TripPhase.NAVI_REQUESTED -> Row(verticalAlignment = Alignment.CenterVertically) {
-            CircularProgressIndicator(Modifier.size(28.dp))
-            Spacer(Modifier.width(12.dp))
-            Text(if (state.naviSearching) "경로를 찾는 중이에요" else "내비게이션에 목적지를 보내는 중이에요")
+private fun ProgressRail(state: TripUiState, vm: TripViewModel, onSwitchMode: () -> Unit, modifier: Modifier) {
+    val cs = MaterialTheme.colorScheme
+    val current = stages.indexOfFirst { state.trip?.phase in it.phases }.coerceAtLeast(0)
+    Column(
+        modifier.background(cs.surface).verticalScroll(rememberScrollState()).padding(horizontal = 28.dp, vertical = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        // 실제 SDK 시연 중에 모의 모드 전환이 눈에 띄지 않도록 로고를 길게 눌러야 묻는다.
+        var askSwitch by remember { mutableStateOf(false) }
+        Text(
+            "문앞",
+            style = MaterialTheme.typography.displaySmall,
+            color = cs.primary,
+            modifier = Modifier.combinedClickable(onClick = {}, onLongClick = { askSwitch = true }),
+        )
+        if (askSwitch) {
+            AlertDialog(
+                onDismissRequest = { askSwitch = false },
+                title = { Text(if (vm.isFake) "실제 SDK 모드로 바꿀까요?" else "모의 응답 모드로 바꿀까요?", style = MaterialTheme.typography.headlineSmall) },
+                text = { Text("화면을 다시 열고 진행 중인 외출은 유지해요. 모의 응답 모드에서는 화면 위에 항상 표시가 나와요.", style = MaterialTheme.typography.bodyLarge) },
+                confirmButton = { TextButton(onClick = { askSwitch = false; onSwitchMode() }) { Text("바꾸기", style = MaterialTheme.typography.labelLarge) } },
+                dismissButton = { TextButton(onClick = { askSwitch = false }) { Text("닫기", style = MaterialTheme.typography.labelLarge) } },
+            )
         }
-        TripPhase.APPROACHING -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("주차한 뒤 눌러 주세요")
-            Button(onClick = { vm.confirmParking(null) }) { Text("주차했어요") }
-            OutlinedButton(onClick = { vm.reportUnavailable() }) { Text("이 주차 구역을 이용할 수 없어요") }
+        Text("함께 내리는 도착 계획", style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
+        Spacer(Modifier.height(16.dp))
+        state.venue?.let { v ->
+            Text(v.name, style = MaterialTheme.typography.titleLarge)
+            v.area?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant) }
+            if (v.demo) Pill("시연 데이터 · 실제 시설 검증 아님", container = cs.tertiaryContainer, content = cs.onTertiaryContainer)
         }
-        TripPhase.PARKED, TripPhase.WALKING -> WalkHandoff(vm, state, setupBlocked)
-        TripPhase.VISITING -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("입구에 도착했어요. 방문을 마치면 눌러 주세요.")
-            Button(onClick = vm::startReturn) { Text("차로 돌아가기") }
-        }
-        TripPhase.RETURNING -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("주차 위치: ${state.trip.parkingNote ?: "메모 없음"}")
-            Button(onClick = vm::backInCar) { Text("차에 탔어요") }
-        }
-        TripPhase.REPLANNING -> Text("같은 조건으로 다른 계획을 찾는 중이에요")
-        TripPhase.NEEDS_CHECK -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("확인된 대안이 없어요.", fontSize = 22.sp)
-            state.venue?.contact?.let { Text("시설 연락처: $it") }
-            OutlinedButton(onClick = vm::startOver) { Text("다른 목적지로 다시 계획") }
-        }
-        TripPhase.COMPLETED, TripPhase.CANCELLED -> Button(onClick = vm::startOver) { Text("새 여행 계획") }
-    }
-}
-
-@Composable
-private fun ConditionsPanel(
-    c: TravelConditions,
-    onChange: (TravelConditions) -> Unit,
-    onConfirm: () -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("이동 조건을 확인해 주세요", fontSize = 22.sp)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(c.stepFreeRequired, { onChange(c.copy(stepFreeRequired = !c.stepFreeRequired)) }, { Text("계단 없는 동선") })
-            FilterChip(c.preferShortWalk, { onChange(c.copy(preferShortWalk = !c.preferShortWalk)) }, { Text("보행 거리 짧게") })
-        }
-        Text("차에서 내려 입구까지 함께 이동해야 하나요?")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(c.companionRequired, { onChange(c.copy(companionRequired = !c.companionRequired)) }, { Text("입구까지 동행 필요") })
-            FilterChip(c.otherGuardian, { onChange(c.copy(otherGuardian = !c.otherGuardian)) }, { Text("다른 보호자 있음") })
-        }
-        Button(onClick = onConfirm) { Text("이 조건으로 계획 보기") }
-    }
-}
-
-@Composable
-private fun PlanComparison(vm: TripViewModel, state: TripUiState) {
-    val results = state.evaluation?.results.orEmpty()
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        items(results, key = { it.candidate.id }) { r -> CandidateCard(r) { vm.choosePlan(r.candidate) } }
-    }
-}
-
-@Composable
-private fun CandidateCard(r: CandidateResult, onChoose: () -> Unit) {
-    val label = when (r.verdict.kind) {
-        VerdictKind.RECOMMENDED -> "추천"
-        VerdictKind.ELIGIBLE -> "가능"
-        VerdictKind.NEEDS_CHECK -> "확인 필요"
-        VerdictKind.EXCLUDED -> "추천하지 않음"
-    }
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text("[$label] ${r.candidate.name}", fontSize = 20.sp)
-            r.verdict.reasons.forEach { Text("· $it") }
-            if (r.verdict.kind == VerdictKind.RECOMMENDED || r.verdict.kind == VerdictKind.ELIGIBLE) {
-                Button(onClick = onChoose) { Text("이 계획으로 안내") }
+        Spacer(Modifier.height(20.dp))
+        stages.forEachIndexed { i, stage ->
+            val done = i < current
+            val active = i == current
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
+                Box(
+                    Modifier.size(34.dp).clip(CircleShape).background(
+                        when {
+                            active -> cs.primary
+                            done -> cs.secondary
+                            else -> cs.surfaceVariant
+                        },
+                    ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(if (done) "✓" else "${i + 1}", color = if (active || done) cs.onPrimary else cs.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
+                }
+                Spacer(Modifier.width(14.dp))
+                Text(
+                    stage.label,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = if (active) FontWeight.Bold else FontWeight.Normal),
+                    color = if (active) cs.onSurface else cs.onSurfaceVariant,
+                )
             }
         }
-    }
-}
-
-/** 주차 후 휴대폰 이어보기. QR은 주행 제한과 NO_SETUP이 모두 풀렸을 때만 그린다. */
-@Composable
-private fun WalkHandoff(vm: TripViewModel, state: TripUiState, setupBlocked: Boolean) {
-    val venue = state.venue ?: return
-    val plan = state.trip?.selectedCandidateId?.let(venue::candidate) ?: return
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("${venue.entrance(plan.walk.toEntranceId)?.name ?: "입구"}까지 이동 순서", fontSize = 22.sp)
-        plan.walk.steps.forEachIndexed { i, s -> Text("${i + 1}. $s") }
-        when {
-            setupBlocked -> Unit
-            state.shareLink != null -> {
-                Text("휴대폰 카메라로 QR을 열면 안내를 이어 볼 수 있어요")
-                val qr = remember(state.shareLink.url) { qrBitmap(state.shareLink.url) }
-                Image(qr, contentDescription = "휴대폰 안내 QR", modifier = Modifier.size(220.dp))
-            }
-            state.shareFailed -> Text("휴대폰 연결을 만들지 못했어요. 이 화면의 안내로 이동해 주세요.")
-            else -> Text("휴대폰 안내 링크를 만드는 중이에요")
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (state.trip.phase == TripPhase.PARKED) Button(onClick = vm::startWalking) { Text("걷기 시작") }
-            if (state.trip.phase == TripPhase.WALKING) Button(onClick = vm::arrivedAtEntrance) { Text("입구에 도착했어요") }
-            OutlinedButton(onClick = { vm.reportUnavailable() }) { Text("이 입구를 이용할 수 없어요") }
+        Spacer(Modifier.height(24.dp))
+        vm.demo?.let {
+            DemoControlsPanel(it)
+            TextButton(onClick = onSwitchMode) { Text("실제 SDK 모드로 전환", style = MaterialTheme.typography.bodyMedium) }
         }
     }
-}
-
-private fun qrBitmap(text: String, size: Int = 512): ImageBitmap {
-    val matrix = QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, size, size)
-    val pixels = IntArray(size * size) { i -> if (matrix[i % size, i / size]) 0xFF000000.toInt() else 0xFFFFFFFF.toInt() }
-    return android.graphics.Bitmap.createBitmap(pixels, size, size, android.graphics.Bitmap.Config.ARGB_8888).asImageBitmap()
 }
