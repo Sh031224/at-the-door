@@ -83,7 +83,7 @@
   ],
   "7": [
     ["p", "GitHub 저장소: [제출 전 기입: 저장소 주소] — 소스, README(실행 방법·테스트 환경·APK 위치), 기획서, 테스트 포함"],
-    ["p", "APK: 저장소 apk/[팀명]_문앞_release.apk (실제 Pleos SDK 연결 release 빌드)"],
+    ["p", "APK: 저장소 apk/로이괜_문앞_release.apk (실제 Pleos SDK 연결 release 빌드)"],
     ["p", "시연 영상: [제출 전 기입: 영상 링크 또는 첨부 파일명] — Pleos Connect Emulator v2.1.0 화면 녹화(실제 SDK, 시연 데이터)"]
   ]
 }

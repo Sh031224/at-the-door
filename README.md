@@ -17,7 +17,7 @@
 1. 아래 ‘테스트 환경 및 필요한 설정’대로 Pleos Connect Emulator를 띄웁니다.
 2. APK를 설치하고 실행합니다.
    ```bash
-   adb install -r apk/<팀명>_문앞_release.apk
+   adb install -r apk/로이괜_문앞_release.apk
    adb shell am start -n app.atthedoor/app.atthedoor.app.MainActivity
    ```
 3. (선택) 휴대폰 안내 페이지까지 보려면 같은 PC에서 웹 서버를 띄웁니다. 에뮬레이터는 `http://10.0.2.2:8787`로 이 서버에 접속합니다.
@@ -32,7 +32,7 @@
 cd car-app
 ./gradlew :app:installDebug                                # 실제 Pleos SDK 연결
 ./gradlew :app:installDebug -Patthedoor.useFakes=true      # SDK 대신 가짜 구현(화면에 ‘모의 응답’ 표시)
-./gradlew :app:exportReleaseApk -Patthedoor.teamName=팀명  # apk/팀명_문앞_release.apk 생성
+./gradlew :app:exportReleaseApk -Patthedoor.teamName=로이괜  # apk/로이괜_문앞_release.apk 생성
 ```
 
 `JAVA_HOME`이 없으면 Android Studio 내장 JDK를 씁니다: `export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"`
@@ -94,7 +94,7 @@ SDK는 `https://nexus-playground.pleos.ai/repository/maven-releases/`에서 인�
 
 ## APK 파일 위치
 
-- 저장소의 [`apk/`](apk/) 폴더: `apk/<팀명>_문앞_release.apk`
+- 저장소의 [`apk/`](apk/) 폴더: `apk/로이괜_문앞_release.apk`
 - 디버그 키로 서명한 release 빌드이며, 실제 Pleos SDK를 연결합니다.
 - 휴대폰 안내 서버 주소는 빌드 때 정합니다(`-Patthedoor.shareBaseUrl`, 기본 `http://10.0.2.2:8787`). 서버가 없으면 휴대폰 연결 대신 차량 화면 안내로 계속됩니다.
 - 용량이 GitHub 제한을 넘으면 GitHub Releases에 올리고 링크를 여기에 적습니다.
