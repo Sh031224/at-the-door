@@ -5,9 +5,9 @@
 **문앞**: 보행이 불편한 가족과 차로 외출할 때, 동행 조건에 맞는 승하차·주차 지점과 입구까지의 동선을 출발 전 차 안에서 정하고, 차량 내비게이션에서 휴대폰 보행 안내까지 이어 주는 도착 계획 앱입니다. (Pleos Connect / Android Automotive OS)
 
 - 기획·기능 명세: [`문앞_앱개발_시나리오_기능명세.md`](문앞_앱개발_시나리오_기능명세.md)
-- 기존 구동 시연: [`docs/문앞_시연영상.mp4`](docs/문앞_시연영상.mp4) (Pleos Connect Emulator v2.1.0, 실제 Pleos SDK, 시연 데이터, 약 2분 52초, UI 변경 전)
+- 구동 시연: [`docs/문앞_시연영상.mp4`](docs/문앞_시연영상.mp4) (Pleos Connect Emulator v2.1.0, 실제 Pleos SDK, 시연 데이터, 약 2분 43초, 2026-11-14 변경 UI)
 - 가족 시나리오 영상: [러프 v2 MP4](docs/video-draft-2026-11-14/문앞_스토리영상_러프_v2.mp4) · [장면별 플레이어](docs/video-draft-2026-11-14/v2.html) (3분, 가족 일러스트와 Pleos 전체 구도 합성·UI 시안·실제 웹 캡처를 연결한 영상)
-- 변경한 UI: [`docs/ui-applied-2026-11-14/`](docs/ui-applied-2026-11-14/) (차량 Compose 렌더링·실제 휴대폰 웹 캡처). [Pleos 전체 구도](docs/ui-applied-2026-11-14/pleos-full-preview.jpg)는 기존 OS 프레임과 변경한 UI를 합성한 예시입니다. 변경한 APK의 Pleos 실행은 아직 확인하지 않았습니다.
+- 변경한 UI: [`docs/ui-applied-2026-11-14/`](docs/ui-applied-2026-11-14/) (차량 Compose 렌더링·실제 휴대폰 웹 캡처). [Pleos 전체 구도](docs/ui-applied-2026-11-14/pleos-full-preview.jpg)는 기존 OS 프레임과 변경한 UI를 합성한 예시입니다. 변경한 APK는 2026-11-14 Pleos Connect Emulator에서 실제 SDK로 처음부터 복귀까지 실행해 구동 시연 영상으로 녹화했습니다.
 - 기존 에뮬레이터 화면: [`docs/screens/`](docs/screens/)
 
 ## 실행 방법
