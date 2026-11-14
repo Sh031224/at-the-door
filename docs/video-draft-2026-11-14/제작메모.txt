@@ -1,0 +1,37 @@
+문앞 스토리 영상 러프 v1
+2026.11.14
+
+재생
+- index.html: 영상과 8개 장면 바로 보기
+- 문앞_스토리영상_러프_v1.mp4: 일반 동영상 플레이어에서 재생
+- 영상대본.txt: 타임코드와 대사
+- 대사자막.srt: 외부 편집용 자막. MP4에는 같은 대사가 이미 표시됨
+- timeline.json: 컷 길이, 화면, 대사, 자막 시간 편집
+- 검토용_장면모음.jpg: 16개 시점의 프레임 모음
+
+표현과 범위
+가상 가족을 그린 AI 일러스트를 천천히 이동시키고 장면 사이를 연결한 애니매틱이다.
+배우의 동작을 연속 생성한 실사 영상은 아니다. 대사와 화면 순서, 감정의 흐름을 보기 위한 초안이다.
+UI는 docs/ux-concept-2026-11-14의 신규 시안이며 아직 실제 APK에 반영되기 전이다.
+실제 구동 증빙은 별도의 기존 docs/문앞_시연영상.mp4와 구별한다.
+시설과 거리, 입구 이미지는 시연 데이터다. QR은 시안용 샘플이다.
+주차와 입구 도착은 사람의 직접 확인으로 표현한다. 앱의 안내 범위는 건물 입구까지다.
+
+재료
+- assets/story-atlas.png: imagegen으로 이번 이야기를 위해 만든 가상 가족 9컷. 원본 보존
+- UI 캡처: ../ux-concept-2026-11-14/screenshots의 8개 화면
+- 한글 폰트: Asta Sans. ../ux-concept-2026-11-14/assets/fonts/OFL.txt 참조
+- 임시 음성: macOS say의 한국어 Yuna. 한 가지 음성의 읽기 속도를 역할별로 조절
+- 배경음: build_video.py에서 직접 합성한 낮은 음량의 임시 패드. 외부 음악 샘플 없음
+
+다시 만들기
+저장소의 docs/ux-concept-2026-11-14를 함께 유지한다.
+macOS에서 Python 3.9 이상, 한국어 Yuna 음성이 필요하다.
+
+python3 -m venv /tmp/atthedoor-video-tools
+/tmp/atthedoor-video-tools/bin/pip install pillow imageio-ffmpeg
+/tmp/atthedoor-video-tools/bin/python docs/video-draft-2026-11-14/build_video.py
+
+빌드 스크립트는 이 폴더의 MP4, 대본, SRT, 음성 타이밍 JSON, 검토용 이미지와 포스터를 다시 만든다.
+임시 오디오와 프레임은 운영체제 임시 폴더에 만들고 성공 후 정리한다.
+기존 구동 시연 영상, 기획서, 제출 양식, 앱 소스는 수정하지 않는다.

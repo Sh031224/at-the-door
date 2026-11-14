@@ -1,0 +1,96 @@
+{
+  "date": "2026-11-14",
+  "kind": "브라우저에서 렌더링한 독립 UX 시안. APK 및 SDK 검증 아님.",
+  "checks": [
+    "JavaScript 문법 검사 통과",
+    "조건 수정 후 닫기 시 기존 조건 유지 확인",
+    "한 번의 안내 동작으로 주행 상태 전환 확인",
+    "휴대폰 도착 → 방문 → 복귀 전환 확인",
+    "차량·휴대폰·분할 화면 캡처 및 육안 검토",
+    "갤러리의 모든 이미지 로딩과 가로 넘침 없음 확인",
+    "개정 시나리오 8장면의 0:00~3:00 연속 구성 확인",
+    "입구 막힘 후 거리 증가 대안을 선택 화면에서 보류 확인",
+    "대안 수락 후 정문 140m 안내로 전환 확인",
+    "대안 거절 시 막힌 문 이미지·동선 없이 주차 위치 안내 확인",
+    "거리 비교를 주차장 기준 전체 동선으로 명시하고 현재 위치의 남은 거리로 표시하지 않음 확인",
+    "새 선택 화면의 안내 문구가 고정 버튼과 겹치지 않음 확인",
+    "기획서·PDF·접수양식에 새 UX의 차량 앱 미반영 상태 명시"
+  ],
+  "screenshots": [
+    {
+      "file": "00-overview.jpg",
+      "width": 1760,
+      "height": 1150
+    },
+    {
+      "file": "01-plan.jpg",
+      "width": 1682,
+      "height": 1210
+    },
+    {
+      "file": "02-driving.jpg",
+      "width": 1682,
+      "height": 1210
+    },
+    {
+      "file": "03-arrival.jpg",
+      "width": 1682,
+      "height": 1210
+    },
+    {
+      "file": "04-parked.jpg",
+      "width": 1682,
+      "height": 1210
+    },
+    {
+      "file": "05-phone-guide.jpg",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "06-phone-visit.jpg",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "07-phone-return.jpg",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "08-conditions.jpg",
+      "width": 1682,
+      "height": 1210
+    },
+    {
+      "file": "09-split-window.jpg",
+      "width": 840,
+      "height": 1210
+    },
+    {
+      "file": "10-no-alternative.jpg",
+      "width": 1682,
+      "height": 1210
+    },
+    {
+      "file": "11-phone-replan.jpg",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "12-storyboard.jpg",
+      "width": 1760,
+      "height": 1210
+    }
+  ],
+  "documents": {
+    "specPdfPages": 25,
+    "contentSynced": true,
+    "formUnchangedOutsideSections": [
+      4,
+      5
+    ],
+    "formLayoutVerified": false,
+    "formLayoutLimitation": "한글 글꼴 렌더링 문제로 인쇄 레이아웃 최종 검증 미완료. 원본 표·내용 컨트롤과 수정 범위는 비교 확인."
+  }
+}

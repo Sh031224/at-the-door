@@ -1,0 +1,24 @@
+{
+  "duration_seconds": 180,
+  "dimensions": [
+    1280,
+    720
+  ],
+  "fps": 24,
+  "decoded_video_frames": 4320,
+  "full_decode_exit": 0,
+  "audio_codec": "AAC",
+  "video_codec": "H.264",
+  "audio_peak_dbfs": -5.4,
+  "browser": {
+    "playback": true,
+    "chapter_seek_seconds": 62.079411,
+    "seekable_range": [
+      0,
+      180
+    ],
+    "media_error": null
+  },
+  "visual_review": "장면 모음의 16개 프레임: 자막, UI 배치, 한글, 결말 확인",
+  "scope": "가상 가족 일러스트와 신규 UI 시안으로 구성한 러프 영상. 실제 APK 동작 증빙 아님"
+}
