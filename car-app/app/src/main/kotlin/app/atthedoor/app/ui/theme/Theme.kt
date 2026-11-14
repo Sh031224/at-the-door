@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.sp
 
 /*
  * 차량 화면 룩앤필. 순정 인포테인먼트처럼 밝은 회색 바탕 위 흰 평면, 그림자 없이 1px 구분선,
- * 직각에 가까운 패널, 검정 고대비 글자, 딥 네이비 주 색 하나와 현재 단계 표시용 오렌지만 쓴다.
+ * 둥근 패널, 검정 고대비 글자와 중립색 주 동작, 동선 표시용 파란색을 쓴다.
  * 로고·상표·전용 서체는 쓰지 않고 시스템 서체를 쓴다.
  */
 
@@ -68,15 +68,15 @@ data class AtdColors(
 )
 
 private val Light = AtdColors(
-    bg = Color(0xFFF0F0F0), surface = Color(0xFFFFFFFF), surfaceAlt = Color(0xFFF7F7F7), line = Color(0xFFD6D6D6),
+    bg = Color(0xFFF5F6F8), surface = Color(0xFFFFFFFF), surfaceAlt = Color(0xFFF7F7F7), line = Color(0xFFE0E2E6),
     lineStrong = Color(0xFF9E9E9E), fill = Color(0xFFEDEDED), fillPressed = Color(0xFFDCDCDC),
     inverse = Color(0xFF111111), inverseSub = Color(0xFF333333), onInverse = Color(0xFFFFFFFF),
-    primarySoft = Color(0xFFE6ECF3), primaryPressed = Color(0xFF001A3A), report = Color(0xFFA84300),
+    primarySoft = Color(0xFFE6ECF3), primaryPressed = Color(0xFF32353C), report = Color(0xFFA84300),
     ink = Color(0xFF111111), inkMuted = Color(0xFF555555), inkFaint = Color(0xFFABABAB),
-    primary = Color(0xFF002C5F), onPrimary = Color(0xFFFFFFFF), route = Color(0xFF0A4FA8), accent = Color(0xFFF08A00),
+    primary = Color(0xFF43464E), onPrimary = Color(0xFFFFFFFF), route = Color(0xFF2D4E75), accent = Color(0xFFF08A00),
     caution = Color(0xFF9A5B00), cautionBg = Color(0xFFFFF3DF), cautionFill = Color(0xFFF2B33D), onCautionFill = Color(0xFF111317),
     danger = Color(0xFFB3261E), dangerBg = Color(0xFFFCE8E6), info = Color(0xFF0B5CAD), infoBg = Color(0xFFE6F0FB),
-    success = Color(0xFF1B7A3E), successBg = Color(0xFFE3F3E8), demo = Color(0xFF6B4E00), demoBg = Color(0xFFFFE9A8),
+    success = Color(0xFF436C61), successBg = Color(0xFFE3F3E8), demo = Color(0xFF6B4E00), demoBg = Color(0xFFFFE9A8),
     recommended = Color(0xFF0A6B45), eligible = Color(0xFF111111), needsCheck = Color(0xFF7A4600), excluded = Color(0xFF555555),
 )
 
@@ -157,7 +157,7 @@ fun AtTheDoorTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composa
         MaterialTheme(
             colorScheme = scheme,
             typography = material,
-            shapes = Shapes(extraSmall = RoundedCornerShape(4.dp), small = RoundedCornerShape(4.dp), medium = RoundedCornerShape(4.dp), large = RoundedCornerShape(0.dp)),
+            shapes = Shapes(extraSmall = RoundedCornerShape(12.dp), small = RoundedCornerShape(12.dp), medium = RoundedCornerShape(12.dp), large = RoundedCornerShape(12.dp)),
             content = content,
         )
     }

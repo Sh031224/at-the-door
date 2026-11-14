@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    id("app.cash.paparazzi") version "2.0.0-alpha05.1"
 }
 
 // ./gradlew :app:assembleDebug -Patthedoor.useFakes=true  → SDK 대신 가짜 구현으로 실행(화면에 ‘모의 응답’ 표시)
@@ -61,6 +62,7 @@ android {
 }
 
 dependencies {
+    testImplementation(libs.junit)
     implementation(project(":domain"))
     implementation(project(":data"))
     implementation(project(":platform"))

@@ -69,9 +69,10 @@ fun BoxScope.Sheets(sheet: Sheet, state: TripUiState, vm: TripViewModel, onClose
         Sheet.CONDITIONS -> SideSheet("이동 조건", onClose, footer = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 SheetPreview(state)
-                AtdButton("적용", onClose, Modifier.fillMaxWidth())
+                AtdButton("이 조건 저장", { vm.confirmConditions(); onClose() }, Modifier.fillMaxWidth())
             }
         }) {
+            CompanionChoice(state.draft, vm::updateDraft)
             ConditionsEditor(state.draft, vm::updateDraft)
             Text("도착 예정 시각", style = Type.title, color = Atd.colors.ink)
             @OptIn(ExperimentalLayoutApi::class)

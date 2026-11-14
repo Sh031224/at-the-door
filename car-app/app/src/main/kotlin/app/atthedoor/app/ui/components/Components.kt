@@ -243,7 +243,7 @@ fun NoticeStrip(text: String, tone: Tone, modifier: Modifier = Modifier, large: 
 @Composable
 fun Panel(modifier: Modifier = Modifier, padding: Dp = 32.dp, spacing: Dp = 20.dp, content: @Composable ColumnScope.() -> Unit) {
     val c = Atd.colors
-    Column(modifier.background(c.surface).border(1.dp, c.line).padding(padding), verticalArrangement = Arrangement.spacedBy(spacing), content = content)
+    Column(modifier.background(c.surface, androidx.compose.foundation.shape.RoundedCornerShape(12.dp)).border(1.dp, c.line, androidx.compose.foundation.shape.RoundedCornerShape(12.dp)).padding(padding), verticalArrangement = Arrangement.spacedBy(spacing), content = content)
 }
 
 @Composable

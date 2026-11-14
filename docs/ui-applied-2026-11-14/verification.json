@@ -1,0 +1,45 @@
+{
+  "capture": "실제 변경 코드",
+  "vehicle": {
+    "source": "car-app/app/src/main/kotlin/app/atthedoor/app/ui/screens/ArrivalPlan.kt",
+    "renderer": "Paparazzi 2.0.0-alpha05.1 / Android Compose",
+    "dimensions": [
+      1682,
+      1210
+    ],
+    "emulator_runtime": false
+  },
+  "phone": {
+    "source": "web/src/page.tsx",
+    "capture": "실제 로컬 웹 서버",
+    "dimensions": [
+      390,
+      960
+    ],
+    "states": [
+      "guide",
+      "visit",
+      "return"
+    ]
+  },
+  "checks": {
+    "android_debug_build": "passed",
+    "domain_tests": 40,
+    "data_tests": 6,
+    "compose_capture_tests": 1,
+    "web_tests": 15,
+    "web_typecheck": "passed",
+    "pdf_rendered_pages": 21,
+    "docx_participant_and_consent_tables_unchanged": true,
+    "docx_content_controls_preserved": true,
+    "docx_print_layout": "기존 인쇄 레이아웃 미검증 상태 유지"
+  },
+  "remaining": "거리 증가 대안 수락 단계는 기존 브라우저 시안 범위이며 이번 UI 적용에는 포함하지 않음",
+  "full_pleos_preview": {
+    "file": "pleos-full-preview.jpg",
+    "type": "합성 적용 예시",
+    "system_frame": "기존 docs/문앞_시연영상.mp4의 1초 프레임",
+    "app_frame": "수정한 Compose 코드의 car-home.png",
+    "native_emulator_capture": false
+  }
+}

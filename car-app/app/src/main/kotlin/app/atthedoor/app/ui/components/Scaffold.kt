@@ -42,7 +42,7 @@ import app.atthedoor.app.ui.theme.Type
 /** 사용자 말로 된 4단계. 시스템 단계(내비 연결, 재계획)는 따로 세지 않는다. */
 enum class Stage(val label: String) { PREPARE("준비"), DRIVE("가는 중"), WALK("입구까지"), BACK("돌아오기") }
 
-/** 상단바: 앱 이름·목적지, 4단계, 시연 배지, 더보기. 앱 이름을 길게 누르면 시연 패널을 연다. */
+/** 상단바: 앱 이름·현재 단계·시연 배지·더보기. 목적지는 본문에서 확인한다. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TopBar(venueName: String?, stage: Stage, demo: Boolean, onMore: () -> Unit, onLogoLongPress: () -> Unit, finished: Boolean = false) {
@@ -55,30 +55,8 @@ fun TopBar(venueName: String?, stage: Stage, demo: Boolean, onMore: () -> Unit, 
                 style = Type.title.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
                 color = c.ink,
             )
-            Text(venueName?.let { "· $it" } ?: "", Modifier.widthIn(max = 520.dp), style = Type.body, color = c.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(if (finished) "외출 완료" else if (stage == Stage.PREPARE) "출발 전" else stage.label, style = Type.body, color = c.inkMuted)
             Spacer(Modifier.weight(1f))
-            Stage.entries.forEach { s ->
-                val active = s == stage && !finished
-                val done = s.ordinal < stage.ordinal || finished
-                Row(Modifier.padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier.size(34.dp).background(if (active) c.primary else androidx.compose.ui.graphics.Color.Transparent, androidx.compose.foundation.shape.CircleShape)
-                            .border(1.5.dp, if (active) c.primary else if (done) c.inkMuted else c.inkFaint, androidx.compose.foundation.shape.CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        if (done) Icon(Glyph.Check, null, tint = c.inkMuted, modifier = Modifier.size(22.dp))
-                        else Text("${s.ordinal + 1}", style = Type.badge, color = if (active) c.onPrimary else c.inkFaint)
-                    }
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        s.label,
-                        style = if (active) Type.label.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) else Type.label,
-                        color = if (active) c.ink else if (done) c.inkMuted else c.inkFaint,
-                    )
-                }
-                if (s != Stage.entries.last()) Box(Modifier.width(24.dp).height(1.5.dp).background(c.line))
-            }
-            Spacer(Modifier.width(28.dp))
             if (demo) DemoBadge()
             Box(Modifier.size(Touch.min).clickable(onClick = onMore).semantics { contentDescription = "더보기" }, contentAlignment = Alignment.Center) {
                 Icon(Glyph.More, null, tint = c.ink, modifier = Modifier.size(40.dp))
@@ -101,7 +79,7 @@ data class Segment(
 )
 
 /**
- * 하단 액션 영역. 순정 내비 ‘안내 종료’ 바처럼 화면 아래에 붙은 세그먼트로, 주 동작은 늘 왼쪽(운전석 쪽) 절반이다.
+ * 하단 액션 영역. 주 동작은 왼쪽의 넓은 버튼, 보조 동작은 오른쪽에 둔다.
  * 세그먼트는 최대 3개. 보조가 없으면 주 동작이 전체 폭을 쓴다.
  */
 @Composable
@@ -109,10 +87,10 @@ fun ActionBar(primary: Segment, vararg secondaries: Segment) {
     val c = Atd.colors
     Column(Modifier.fillMaxWidth().background(c.surface)) {
         Hairline()
-        Row(Modifier.fillMaxWidth().height(Grid.actionBar)) {
-            SegmentCell(primary, Modifier.weight(if (secondaries.isEmpty()) 1f else 1f))
+        Row(Modifier.fillMaxWidth().padding(horizontal = Grid.margin, vertical = 16.dp).height(Grid.actionBar), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+            SegmentCell(primary, Modifier.weight(if (secondaries.isEmpty()) 1f else 3f))
             if (secondaries.isNotEmpty()) {
-                Row(Modifier.weight(1f).fillMaxHeight()) {
+                Row(Modifier.weight(if (secondaries.size > 1) 2f else 1f).fillMaxHeight()) {
                     secondaries.forEach { s ->
                         Box(Modifier.width(1.dp).fillMaxHeight().background(c.line))
                         SegmentCell(s, Modifier.weight(1f))
@@ -142,7 +120,7 @@ private fun SegmentCell(s: Segment, modifier: Modifier) {
         else -> c.ink
     }
     Row(
-        modifier.fillMaxHeight().background(bg)
+        modifier.fillMaxHeight().background(bg, androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
             .clickable(interactionSource = source, indication = null, enabled = s.enabled, role = Role.Button, onClick = s.onClick)
             .padding(horizontal = 28.dp),
         horizontalArrangement = Arrangement.Center,

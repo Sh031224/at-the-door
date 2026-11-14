@@ -111,8 +111,7 @@ fun shortPoint(name: String, venue: Venue?): String {
 @Composable
 fun PhaseBody(state: TripUiState, vm: TripViewModel, setupBlocked: Boolean, cue: HandoffCue?, open: (Sheet) -> Unit) {
     when (state.trip?.phase) {
-        null, TripPhase.PLANNING -> PlanningBody(state, vm, open)
-        TripPhase.CHOOSING, TripPhase.NAVI_REQUESTED -> ChoosingBody(state, vm, open)
+        null, TripPhase.PLANNING, TripPhase.CHOOSING, TripPhase.NAVI_REQUESTED -> ArrivalPlanBody(state, vm::editConditions, open)
         TripPhase.APPROACHING -> ApproachBody(state, cue)
         TripPhase.PARKED -> ParkedBody(state, vm, setupBlocked, open)
         TripPhase.WALKING -> WalkingBody(state, open)
@@ -135,7 +134,7 @@ class PhaseCallbacks(val speak: () -> Unit, val dial: (String) -> Unit, val open
 fun phaseActions(state: TripUiState, vm: TripViewModel, cb: PhaseCallbacks, open: (Sheet) -> Unit): Pair<Segment, List<Segment>>? {
     val phase = state.trip?.phase ?: return null
     return when (phase) {
-        TripPhase.PLANNING -> Segment("이 조건으로 계획 보기", vm::confirmConditions, SegmentKind.PRIMARY, Glyph.Arrow, enabled = state.venue != null) to
+        TripPhase.PLANNING -> Segment("이동 조건 확인", { open(Sheet.CONDITIONS) }, SegmentKind.PRIMARY, Glyph.Check, enabled = state.venue != null) to
             listOf(if (state.voice.listening) Segment("듣고 있어요 · 멈추기", vm::stopListening, icon = Glyph.Mic) else Segment("말로 정하기", cb.speak, icon = Glyph.Mic))
         TripPhase.CHOOSING -> {
             val focus = focusOf(state)
@@ -145,7 +144,7 @@ fun phaseActions(state: TripUiState, vm: TripViewModel, cb: PhaseCallbacks, open
                 // 시트에 보이는 줄 수(가능 + 확인 필요)와 같게 센다. 추천하지 않는 곳은 시트 안에서 따로 접어 둔다.
                 val others = state.evaluation?.results?.count { it.verdict.kind != VerdictKind.EXCLUDED && it.candidate.id != focus.candidate.id } ?: 0
                 val retry = state.trip.notice != null && focus.candidate.id == state.trip.selectedCandidateId
-                Segment(if (retry) "같은 계획으로 다시 안내" else "이 계획으로 안내", { vm.choosePlan(focus.candidate) }, SegmentKind.PRIMARY, Glyph.Navigate) to
+                Segment(if (retry) "같은 계획으로 다시 안내" else "${Josa.euroRo(shortPoint(focus.candidate.accessPoint.approach, state.venue))} 안내", { vm.choosePlan(focus.candidate) }, SegmentKind.PRIMARY, Glyph.Navigate) to
                     listOf(Segment(if (others > 0) "다른 계획 ${others}개 보기" else "다른 후보 보기", { open(Sheet.OTHER_PLANS) }))
             }
         }
@@ -164,8 +163,8 @@ fun phaseActions(state: TripUiState, vm: TripViewModel, cb: PhaseCallbacks, open
             // 멀리 있을 때는 ‘주차했어요’를 바에 두지 않는다(⋯ 안에만). 신호 대기 중 잘못 누르지 않게 한다.
             Segment("내비 화면 보기", cb.openNavi, SegmentKind.PRIMARY, Glyph.Navigate) to emptyList()
         }
-        TripPhase.PARKED -> Segment("입구로 출발", vm::startWalking, SegmentKind.PRIMARY, Glyph.Walk) to
-            listOfNotNull(Segment("휴대폰 없이 진행", vm::skipPhone).takeIf { state.share is ShareState.Ready })
+        TripPhase.PARKED -> Segment("차량에서 안내 보기", { vm.skipPhone(); vm.startWalking() }, SegmentKind.PRIMARY, Glyph.Walk) to
+            listOf(Segment("주차 메모 남기기", { open(Sheet.PARKING_NOTE) }, icon = Glyph.Parking))
         TripPhase.WALKING -> Segment("입구에 도착했어요", vm::arrivedAtEntrance, SegmentKind.PRIMARY, Glyph.Check) to
             listOf(Segment("입구가 막혀 있어요 · 다른 입구 찾기", { vm.reportEntranceBlocked() }, SegmentKind.REPORT, Glyph.Warning))
         TripPhase.VISITING -> Segment("차로 돌아가기", vm::startReturn, SegmentKind.PRIMARY, Glyph.Car) to listOf(Segment("아직 도착하지 않았어요", vm::undoArrival))
@@ -265,7 +264,7 @@ private fun PreviewLine(state: TripUiState) {
 
 /** 음성 입력 상태. 버튼은 하단 바에 있고, 여기에는 들은 말과 맞춘 조건만 보여 준다. */
 @Composable
-private fun VoiceFeedback(state: TripUiState) {
+internal fun VoiceFeedback(state: TripUiState) {
     val c = Atd.colors
     val v = state.voice
     val (text, color) = when {
@@ -409,7 +408,7 @@ private fun ParkedBody(state: TripUiState, vm: TripViewModel, setupBlocked: Bool
     Column(verticalArrangement = Arrangement.spacedBy(28.dp)) {
         Headline(
             if (phoneOk) "휴대폰으로 입구 안내를 이어 보세요" else "차 화면으로 ${entrance?.name ?: "입구"}까지 안내할게요",
-            sub = if (phoneOk) "휴대폰으로 QR을 찍은 뒤 ‘입구로 출발’을 누르세요. 걸으면서 순서와 입구를 볼 수 있어요." else null,
+            sub = if (phoneOk) "QR을 열면 같은 계획으로 바로 이어져요. 차량에서 출발 버튼을 다시 누를 필요 없어요." else null,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(Gap)) {
             Panel(Modifier.width(560.dp)) {

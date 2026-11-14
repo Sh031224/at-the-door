@@ -78,7 +78,9 @@ fun TripScreen(vm: TripViewModel, onSwitchMode: () -> Unit) {
 
     // 단계가 바뀌면 열린 시트를 닫는다. 주행이 시작되면 시트도 함께 숨긴다.
     LaunchedEffect(state.trip?.phase, restricted) { if (restricted) sheet = null }
-    LaunchedEffect(state.trip?.phase) { sheet = null }
+    LaunchedEffect(state.trip?.phase) {
+        if (state.trip?.phase != TripPhase.PLANNING || sheet !in setOf(Sheet.CONDITIONS, Sheet.VENUE)) sheet = null
+    }
 
     CompositionLocalProvider(LocalReduceMotion provides restricted) {
         Box(Modifier.fillMaxSize().background(c.bg)) {

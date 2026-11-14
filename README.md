@@ -5,8 +5,9 @@
 **문앞**: 보행이 불편한 가족과 차로 외출할 때, 동행 조건에 맞는 승하차·주차 지점과 입구까지의 동선을 출발 전 차 안에서 정하고, 차량 내비게이션에서 휴대폰 보행 안내까지 이어 주는 도착 계획 앱입니다. (Pleos Connect / Android Automotive OS)
 
 - 기획·기능 명세: [`문앞_앱개발_시나리오_기능명세.md`](문앞_앱개발_시나리오_기능명세.md)
-- 시연 영상: [`docs/문앞_시연영상.mp4`](docs/문앞_시연영상.mp4) (Pleos Connect Emulator v2.1.0, 실제 Pleos SDK, 시연 데이터, 약 3분 40초)
-- 에뮬레이터 화면: [`docs/screens/`](docs/screens/)
+- 기존 구동 시연: [`docs/문앞_시연영상.mp4`](docs/문앞_시연영상.mp4) (Pleos Connect Emulator v2.1.0, 실제 Pleos SDK, 시연 데이터, 약 2분 52초, UI 변경 전)
+- 변경한 UI: [`docs/ui-applied-2026-11-14/`](docs/ui-applied-2026-11-14/) (차량 Compose 렌더링·실제 휴대폰 웹 캡처). [Pleos 전체 구도](docs/ui-applied-2026-11-14/pleos-full-preview.jpg)는 기존 OS 프레임과 변경한 UI를 합성한 예시입니다. 변경한 APK의 Pleos 실행은 아직 확인하지 않았습니다.
+- 기존 에뮬레이터 화면: [`docs/screens/`](docs/screens/)
 
 ## 실행 방법
 
@@ -38,8 +39,8 @@ cd car-app
 ### 3) 시연 흐름
 
 1. Virtual Console에서 기어를 **P**로 둡니다.
-2. 목적지 ‘새봄문화회관 소공연장’과 이동 조건(계단 없는 동선, 보행 거리 짧게, 입구까지 함께 이동)을 확인합니다. 조건을 바꿀 때마다 오른쪽 ‘지금 조건으로 보면’이 즉시 다시 평가됩니다. ‘말하기’로 조건을 말해도 됩니다.
-3. ‘이 조건으로 계획 보기’ → 후보 비교에서 추천 계획(후문 일반 주차 구역)의 ‘이 계획으로 안내’를 누릅니다. 정문 승하차 구역은 ‘추천하지 않음’, 지하 주차장은 ‘확인 필요’입니다.
+2. 목적지·이동 조건·추천 계획을 한 화면에서 확인합니다. 처음에는 ‘이동 조건 확인’에서 동행자와 이동 조건을 직접 고르고 ‘이 조건 저장’을 누릅니다. ‘말로 정하기’도 사용할 수 있습니다.
+3. 같은 화면에서 추천 계획의 ‘후문 주차장 입구로 안내’를 누릅니다. ‘다른 계획’ 시트에서 비교할 수 있으며, 정문 승하차 구역은 ‘추천하지 않음’, 지하 주차장은 ‘확인 필요’입니다.
 4. 차량 Navigation 앱이 ‘새봄문화회관 후문 주차장 입구’로 안내를 시작하면(약 10초) 문앞이 ‘내비게이션 안내 중’으로 바뀝니다.
 5. 기어를 **D**로 바꾸고 속도를 올리면 주행 중 최소 화면으로 바뀝니다. 여기서 ‘만차예요 · 다른 곳 찾기’를 누르면 같은 조건의 인근 공영주차장으로 내비가 다시 안내되고 음성으로 알립니다.
 6. 다시 **P**로 두고 ‘주차했어요’를 누르면 음성 안내와 휴대폰 안내 QR이 나타납니다(웹 서버 실행 시).
@@ -122,6 +123,7 @@ SDK는 `https://nexus-playground.pleos.ai/repository/maven-releases/`에서 인�
 
 ```bash
 cd car-app && ./gradlew :domain:test :data:testDebugUnitTest   # 규칙 엔진·상태 머신·데이터
+cd car-app && ./gradlew :app:verifyPaparazziDebug             # Compose 화면 비교
 cd web && npm test && npm run typecheck                      # 공유 링크 API
 ```
 
@@ -144,6 +146,8 @@ cd web && npm test && npm run typecheck                      # 공유 링크 API
 | Kotlin, kotlinx.coroutines, kotlinx.serialization | Apache-2.0 |
 | AndroidX (Compose, Activity, Lifecycle, DataStore) | Apache-2.0 |
 | ZXing core | Apache-2.0 |
+| [Paparazzi](https://github.com/cashapp/paparazzi) (Compose 화면 캡처) | Apache-2.0 |
+| Asta Sans (시안·기획서 PDF) | SIL OFL-1.1, [라이선스](docs/ux-concept-2026-11-14/assets/fonts/OFL.txt) |
 | Hono, @hono/node-server | MIT |
 | tsx | MIT |
 | TypeScript | Apache-2.0 |
