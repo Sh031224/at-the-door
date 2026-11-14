@@ -7,6 +7,7 @@
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 import array
+import argparse
 import bisect
 import json
 import math
@@ -19,7 +20,12 @@ import imageio_ffmpeg
 
 ROOT = Path(__file__).resolve().parent
 ASSETS = ROOT / "assets"
-STORY = json.loads((ROOT / "timeline.json").read_text())
+parser = argparse.ArgumentParser(description="문앞 시나리오 러프 영상 재생성")
+parser.add_argument("--version", choices=("v1", "v2"), default="v1")
+OPTIONS = parser.parse_args()
+VERSION = OPTIONS.version
+SUFFIX = "" if VERSION == "v1" else "-v2"
+STORY = json.loads((ROOT / ("timeline.json" if VERSION == "v1" else "timeline-v2.json")).read_text())
 WIDTH, HEIGHT = 1280, 720
 FPS = STORY["fps"]
 SECONDS = STORY["duration"]
@@ -27,7 +33,8 @@ FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
 FONTROOT = ROOT.parent / "ux-concept-2026-11-14" / "assets" / "fonts"
 UIROOT = ROOT.parent / "ux-concept-2026-11-14" / "screenshots"
 WORK = Path(tempfile.mkdtemp(prefix="atthedoor-film-"))
-OUTPUT = ROOT / "문앞_스토리영상_러프_v1.mp4"
+OUTPUT = ROOT / f"문앞_스토리영상_러프_{VERSION}.mp4"
+APPLIED = ROOT.parent / "ui-applied-2026-11-14"
 
 
 def font(size, bold=False):
@@ -48,13 +55,13 @@ def clock(t, sep=":", fraction=False):
 
 
 def make_script():
-    lines = [STORY["title"], "러프 시나리오 영상 v1 · 2026.11.14 · 3분 · 1280×720 / 24fps", STORY["disclosure"], "", "연출 메모", "대사는 생활 말투로, 회상은 짧게. 말이 끝난 뒤 표정과 침묵을 남긴다.", "배우 녹음 전 임시 음성이다. 한 명의 한국어 TTS로 역할별 속도만 달리했다.", "일러스트 정지 컷에 완만한 이동과 디졸브를 붙인 애니매틱이다.", "주차와 도착은 사람이 직접 확인하며, 차량 신호로 자동 확정하지 않는다.", "UI 컷은 신규 시안이다. 실제 APK 화면 녹화나 SDK 동작 증빙이 아니다.", "시설·거리·입구는 demo 데이터이며 실제 장소 정보를 보장하지 않는다.", "공연 후 가족 장면은 가상 이야기다. 앱의 안내 범위는 건물 입구까지다.", "BGM은 빌드 스크립트로 합성한 임시 배경음이다.", "", "장면과 대사"]
+    lines = [STORY["title"], f"러프 시나리오 영상 {VERSION} · 2026.11.14 · 3분 · 1280×720 / 24fps", STORY["disclosure"], "", "연출 메모", "대사는 생활 말투로, 회상은 짧게. 말이 끝난 뒤 표정과 침묵을 남긴다.", "배우 녹음 전 임시 음성이다. 한 명의 한국어 TTS로 역할별 속도만 달리했다.", "일러스트 정지 컷에 완만한 이동과 디졸브를 붙인 애니매틱이다.", "주차와 도착은 사람이 직접 확인하며, 차량 신호로 자동 확정하지 않는다.", ("차량 계획은 수정한 Compose 렌더, 조건·주행·주차·QR은 UX 시안을 기존 Pleos 전체 프레임에 배치한 합성이다. 실제 새 APK의 Pleos 실행 증빙이 아니다." if VERSION == "v2" else "UI 컷은 신규 시안이다. 실제 APK 화면 녹화나 SDK 동작 증빙이 아니다."), "시설·거리·입구는 demo 데이터이며 실제 장소 정보를 보장하지 않는다.", "공연 후 가족 장면은 가상 이야기다. 앱의 안내 범위는 건물 입구까지다.", "BGM은 빌드 스크립트로 합성한 임시 배경음이다.", "", "장면과 대사"]
     subs = []
     for shot in STORY["shots"]:
         start, end = shot["start"], shot["end"]
         lines.append(f"\n{clock(start)[3:]}–{clock(end)[3:]} | {shot['chapter']}")
         if "ui" in shot:
-            lines.append("화면: UI 시안 / " + shot["ui"] + " / " + shot.get("title", ""))
+            lines.append("화면: " + shot.get("provenance", "UI 시안") + " / " + shot.get("applied", shot["ui"]) + " / " + shot.get("title", ""))
         else:
             lines.append("화면: 가상 가족 일러스트 " + str(shot["panel"] + 1))
         for cue in STORY["dialogue"]:
@@ -62,11 +69,19 @@ def make_script():
                 lines.append(cue["speaker"] + ": “" + cue["text"].replace("\n", " ") + "”")
     for i, cue in enumerate(STORY["dialogue"], 1):
         subs.append(f"{i}\n{clock(cue['start'], fraction=True)} --> {clock(cue['end'], fraction=True)}\n{cue['speaker']}: {cue['text']}\n")
-    (ROOT / "영상대본.txt").write_text("\n".join(lines) + "\n")
-    (ROOT / "대사자막.srt").write_text("\n".join(subs))
+    (ROOT / ("영상대본" + SUFFIX + ".txt")).write_text("\n".join(lines) + "\n")
+    (ROOT / ("대사자막" + SUFFIX + ".srt")).write_text("\n".join(subs))
 
 
 def make_audio():
+    if VERSION == "v2":
+        # v1과 대사가 같은 v2는 검토된 동일 음원을 재사용한다.
+        original = json.loads((ROOT / "timeline.json").read_text())
+        if STORY["dialogue"] == original["dialogue"] and STORY["duration"] == original["duration"]:
+            path = WORK / "mix.wav"
+            run([FFMPEG, "-y", "-i", str(ROOT / "문앞_스토리영상_러프_v1.mp4"), "-vn", "-ar", "22050", "-ac", "1", str(path)])
+            (ROOT / ("audio-timing" + SUFFIX + ".json")).write_text((ROOT / "audio-timing.json").read_text())
+            return path
     sample_rate = 22050
     length = sample_rate * SECONDS
     dialogue = array.array("f", [0.0]) * length
@@ -124,11 +139,48 @@ def make_audio():
     path = WORK / "mix.wav"
     with wave.open(str(path), "wb") as f:
         f.setnchannels(1); f.setsampwidth(2); f.setframerate(sample_rate); f.writeframes(pcm.tobytes())
-    (ROOT / "audio-timing.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
+    (ROOT / ("audio-timing" + SUFFIX + ".json")).write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
     return path
 
 
+def paint_ui_v2(shot):
+    canvas = Image.new("RGB", (WIDTH, HEIGHT), "#11151b")
+    d = ImageDraw.Draw(canvas)
+    if shot.get("phone"):
+        source = Image.open(APPLIED / shot["applied"]).convert("RGB")
+        fitted = ImageOps.contain(source, (238, 576), Image.Resampling.LANCZOS)
+        x, y = 900 - fitted.width // 2, 49
+        d.rounded_rectangle((x - 7, y - 7, x + fitted.width + 7, y + fitted.height + 7), 18, fill="#68717b")
+        canvas.paste(fitted, (x, y))
+        if "tap" in shot:
+            tap = shot["tap"]
+            shot["tap_pixels"] = (x + tap["x"] * fitted.width, y + tap["y"] * fitted.height)
+        d.text((65, 200), "수정한 실제 휴대폰 웹 캡처", font=font(18), fill="#b7c4d2")
+        d.multiline_text((65, 246), shot["title"], font=font(37, True), fill="white", spacing=10)
+        d.multiline_text((65, 345), shot.get("detail", ""), font=font(21), fill="#b7c4d2", spacing=12)
+    else:
+        # UI 레이아웃 시연용 합성: 원본 OS 영상과 새 앱 렌더를 보존한다.
+        full = Image.open(APPLIED / "pleos-base-frame.png").convert("RGB")
+        source_path = APPLIED / "car-home.png" if shot.get("applied") else UIROOT / shot["ui"]
+        source = Image.open(source_path).convert("RGB").resize((1262, 908), Image.Resampling.LANCZOS)
+        full.paste(source, (640, 67))
+        fitted = ImageOps.contain(full, (1056, 594), Image.Resampling.LANCZOS)
+        x, y = (WIDTH - fitted.width) // 2, 40
+        canvas.paste(fitted, (x, y))
+        label = "Pleos 전체 구도 · 합성 / " + ("수정 Compose 계획 화면" if shot.get("applied") else "조건·주행·주차 UI 시안")
+        d.text((28, 10), label, font=font(16, True), fill="#f1d39c")
+        d.text((WIDTH - 28, 13), "새 APK의 Pleos 실행 녹화 아님", font=font(14), fill="#bac4ce", anchor="ra")
+        if "tap" in shot:
+            tap = shot["tap"]
+            shot["tap_pixels"] = (x + (640 + tap["x"] * 1262) * fitted.width / 1920, y + (67 + tap["y"] * 908) * fitted.height / 1080)
+    # 대사가 없는 UI 컷도 다음 동작이 읽히게 하되 OS 화면을 가리지 않는다.
+    d.text((WIDTH / 2, 662), shot["title"].replace("\n", " "), font=font(23, True), fill="white", anchor="ma")
+    return canvas
+
+
 def paint_ui(shot):
+    if VERSION == "v2":
+        return paint_ui_v2(shot)
     canvas = Image.new("RGB", (WIDTH, HEIGHT), "#e9ecec")
     d = ImageDraw.Draw(canvas)
     source = Image.open(UIROOT / shot["ui"]).convert("RGB")
@@ -175,6 +227,8 @@ def prepare_frames():
 def header(shot):
     layer = Image.new("RGBA", (WIDTH, HEIGHT))
     d = ImageDraw.Draw(layer)
+    if "ui" in shot and VERSION == "v2":
+        return layer
     if "ui" in shot:
         d.text((38, 20), "문앞  /  " + shot["chapter"], font=font(20, True), fill="#30423e")
         d.text((910, 22), "시나리오 영상 · UI 시안", font=font(17), fill="#576661")
@@ -195,9 +249,9 @@ def subtitles():
     for cue in STORY["dialogue"]:
         layer = Image.new("RGBA", (WIDTH, HEIGHT))
         d = ImageDraw.Draw(layer)
-        d.rectangle((0, 604, WIDTH, HEIGHT), fill=(8, 15, 12, 213))
-        d.text((44, 622), cue["speaker"], font=font(20, True), fill="#c3d7c5")
-        d.multiline_text((260, 617), cue["text"], font=font(29, True), fill="white", spacing=8, stroke_width=0)
+        d.rectangle((0, 634 if VERSION == "v2" else 604, WIDTH, HEIGHT), fill=(8, 15, 12, 240 if VERSION == "v2" else 213))
+        d.text((44, 651 if VERSION == "v2" else 622), cue["speaker"], font=font(20, True), fill="#c3d7c5")
+        d.multiline_text((260, 642 if VERSION == "v2" else 617), cue["text"], font=font(26 if VERSION == "v2" else 29, True), fill="white", spacing=8, stroke_width=0)
         layers.append(layer)
     return layers
 
@@ -239,6 +293,8 @@ def render_video(bases, audio):
                     break
             if frame_no % FPS == 0 and int(t) in capture:
                 base.save(stills / f"{int(t):03}.jpg", quality=90)
+            if VERSION == "v2" and frame_no == round(136.4 * FPS):
+                base.save(ROOT / "v2-입구도착확인.jpg", quality=90)
             if t < 1 or t > SECONDS - .8:
                 amount = t if t < 1 else max(0, (SECONDS - t) / .8)
                 base = Image.blend(Image.new("RGB", (WIDTH, HEIGHT), "#101915"), base, amount)
@@ -258,8 +314,8 @@ def render_video(bases, audio):
         thumb = Image.open(path).resize((320, 180))
         sheet.paste(thumb, (x, y))
         d.text((x + 8, y + 183), clock(int(path.stem))[3:], font=font(14), fill="#30423e")
-    sheet.save(ROOT / "검토용_장면모음.jpg", quality=90)
-    shutil.copyfile(stills / "001.jpg", ROOT / "poster.jpg")
+    sheet.save(ROOT / ("검토용_장면모음" + SUFFIX + ".jpg"), quality=90)
+    shutil.copyfile(stills / "001.jpg", ROOT / ("poster" + SUFFIX + ".jpg"))
 
 
 if __name__ == "__main__":

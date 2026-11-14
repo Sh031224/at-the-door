@@ -1,0 +1,135 @@
+[
+  {
+    "speaker": "손녀",
+    "start": 3.4,
+    "voice_seconds": 4.141,
+    "slot_seconds": 6.18,
+    "tempo_adjustment": 1.0
+  },
+  {
+    "speaker": "어머니",
+    "start": 10.5,
+    "voice_seconds": 1.757,
+    "slot_seconds": 3.18,
+    "tempo_adjustment": 1.0
+  },
+  {
+    "speaker": "아들",
+    "start": 14.5,
+    "voice_seconds": 1.411,
+    "slot_seconds": 2.98,
+    "tempo_adjustment": 1.0
+  },
+  {
+    "speaker": "어머니",
+    "start": 18.5,
+    "voice_seconds": 1.977,
+    "slot_seconds": 4.98,
+    "tempo_adjustment": 1.0
+  },
+  {
+    "speaker": "아들",
+    "start": 24.8,
+    "voice_seconds": 3.167,
+    "slot_seconds": 5.48,
+    "tempo_adjustment": 1.0
+  },
+  {
+    "speaker": "어머니",
+    "start": 34,
+    "voice_seconds": 2.493,
+    "slot_seconds": 5.38,
+    "tempo_adjustment": 1.0
+  },
+  {
+    "speaker": "아들",
+    "start": 41,
+    "voice_seconds": 2.935,
+    "slot_seconds": 5.68,
+    "tempo_adjustment": 1.0
+  },
+  {
+    "speaker": "아들",
+    "start": 48,
+    "voice_seconds": 3.671,
+    "slot_seconds": 6.08,
+    "tempo_adjustment": 1.0
+  },
+  {
+    "speaker": "어머니",
+    "start": 56,
+    "voice_seconds": 2.951,
+    "slot_seconds": 5.38,
+    "tempo_adjustment": 1.0
+  },
+  {
+    "speaker": "아들",
+    "start": 63.5,
+    "voice_seconds": 4.502,
+    "slot_seconds": 6.98,
+    "tempo_adjustment": 1.0
+  },
+  {
+    "speaker": "어머니",
+    "start": 73.6,
+    "voice_seconds": 1.397,
+    "slot_seconds": 3.78,
+    "tempo_adjustment": 1.0
+  },
+  {
+    "speaker": "문앞 · 임시 음성",
+    "start": 99,
+    "voice_seconds": 1.958,
+    "slot_seconds": 3.88,
+    "tempo_adjustment": 1.0
+  },
+  {
+    "speaker": "문앞 · 임시 음성",
+    "start": 107,
+    "voice_seconds": 2.703,
+    "slot_seconds": 6.38,
+    "tempo_adjustment": 1.0
+  },
+  {
+    "speaker": "어머니",
+    "start": 122.4,
+    "voice_seconds": 1.74,
+    "slot_seconds": 3.98,
+    "tempo_adjustment": 1.0
+  },
+  {
+    "speaker": "아들",
+    "start": 127.1,
+    "voice_seconds": 1.414,
+    "slot_seconds": 2.48,
+    "tempo_adjustment": 1.0
+  },
+  {
+    "speaker": "손녀",
+    "start": 141,
+    "voice_seconds": 1.808,
+    "slot_seconds": 4.78,
+    "tempo_adjustment": 1.0
+  },
+  {
+    "speaker": "어머니",
+    "start": 148,
+    "voice_seconds": 1.46,
+    "slot_seconds": 4.38,
+    "tempo_adjustment": 1.0
+  },
+  {
+    "speaker": "아들",
+    "start": 165.1,
+    "voice_seconds": 1.716,
+    "slot_seconds": 3.28,
+    "tempo_adjustment": 1.0
+  },
+  {
+    "speaker": "어머니",
+    "start": 169.3,
+    "voice_seconds": 3.62,
+    "slot_seconds": 7.38,
+    "tempo_adjustment": 1.0
+  }
+]

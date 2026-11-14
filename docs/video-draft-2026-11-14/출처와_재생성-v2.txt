@@ -1,0 +1,24 @@
+문앞 스토리 영상 러프 v2 · Pleos 전체 구도
+
+가족의 약속 → 함께 고른 조건 → 후문 계획 → 주차 직접 확인 → 휴대폰 안내 → 사진 약속 → 어머니의 다음 선택을 3분으로 연결했다.
+
+차량 화면의 출처
+- 기본 OS 구도: docs/문앞_시연영상.mp4 1초 프레임. 기존 차량 정보와 하단 공조/도크를 유지한 합성 배경이다.
+- 계획: docs/ui-applied-2026-11-14/car-home.png. 수정한 실제 Compose 컴포넌트의 Paparazzi 렌더.
+- 조건·주행·주차·QR: docs/ux-concept-2026-11-14/screenshots/의 UX 시안. 실제 변경된 상태별 앱 실행 캡처가 아니다.
+- 모든 차량 UI 컷 상단에 합성 여부를 표시했다. 새 APK의 Pleos 실행 녹화나 SDK 동작 증빙이 아니다.
+- 차량 배경의 주행 상태/공조 값도 이전 프레임의 값이므로 현재 앱과 연동된 실시간 신호가 아니다.
+
+휴대폰 화면의 출처
+- docs/ui-applied-2026-11-14/phone-guide.jpg, phone-visit.jpg, phone-return.jpg. 실제 수정 웹을 로컬에서 캡처.
+- 시설·거리·입구는 demo 데이터다. QR은 UX 시안 샘플이며 실제 공유 링크가 아니다.
+
+가족 장면/음성
+- assets/story-atlas.png의 기존 AI 일러스트를 유지. 가상 인물과 이야기.
+- 배우 녹음 전 Yuna 임시 TTS와 직접 합성한 임시 BGM. v1의 동일 대사 음원을 재사용한다.
+- 주차/입구 도착은 사람이 확인한다. 공연·사진은 앱 안내가 끝난 뒤 가상 가족 이야기다.
+
+재생성
+Python 3.9+, Pillow, imageio-ffmpeg 설치 후:
+python build_video.py --version v2
+v1 기본 출력과 기존 docs/문앞_시연영상.mp4는 변경하지 않는다.

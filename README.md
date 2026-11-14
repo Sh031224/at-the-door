@@ -6,6 +6,7 @@
 
 - 기획·기능 명세: [`문앞_앱개발_시나리오_기능명세.md`](문앞_앱개발_시나리오_기능명세.md)
 - 기존 구동 시연: [`docs/문앞_시연영상.mp4`](docs/문앞_시연영상.mp4) (Pleos Connect Emulator v2.1.0, 실제 Pleos SDK, 시연 데이터, 약 2분 52초, UI 변경 전)
+- 가족 시나리오 영상: [러프 v2 MP4](docs/video-draft-2026-11-14/문앞_스토리영상_러프_v2.mp4) · [장면별 플레이어](docs/video-draft-2026-11-14/v2.html) (3분, 가족 일러스트와 Pleos 전체 구도 합성·UI 시안·실제 웹 캡처를 연결한 영상)
 - 변경한 UI: [`docs/ui-applied-2026-11-14/`](docs/ui-applied-2026-11-14/) (차량 Compose 렌더링·실제 휴대폰 웹 캡처). [Pleos 전체 구도](docs/ui-applied-2026-11-14/pleos-full-preview.jpg)는 기존 OS 프레임과 변경한 UI를 합성한 예시입니다. 변경한 APK의 Pleos 실행은 아직 확인하지 않았습니다.
 - 기존 에뮬레이터 화면: [`docs/screens/`](docs/screens/)
 

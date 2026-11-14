@@ -1,0 +1,26 @@
+{
+  "duration_seconds": 180,
+  "dimensions": [
+    1280,
+    720
+  ],
+  "fps": 24,
+  "decoded_video_frames": 4320,
+  "full_decode_exit": 0,
+  "audio_codec": "AAC",
+  "video_codec": "H.264",
+  "file_bytes": 12603907,
+  "shots": 26,
+  "dialogue_cues": 19,
+  "browser": {
+    "playback": true,
+    "metadata_duration_seconds": 180,
+    "seekable_range": [0, 180],
+    "chapter_seek_seconds": [62.012132, 160],
+    "media_error": null,
+    "visual_review": "계획 장면 전체 Pleos 구도·대사 배치와 장면 모음 확인"
+  },
+  "source_audio": "v1의 동일 대사·음악 재사용",
+  "phone_arrival_confirmation": "135~137초 실제 웹 안내의 도착 확인 버튼 탭 표시 후 137초 방문 화면",
+  "scope": "계획은 실제 Compose 렌더, 조건·주행·주차·QR은 UX 시안. 모든 차량 UI는 기존 Pleos 전체 프레임에 배치한 합성이며 새 APK의 Pleos 실행 증빙이 아님. 휴대폰은 수정 웹의 실제 캡처."
+}
